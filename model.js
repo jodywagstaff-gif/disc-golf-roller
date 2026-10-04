@@ -1,4 +1,5 @@
 // Serializable domain state. UI and storage are adapters, not scoring rules.
+import {QUICK_STOP_DURATION} from './reel-motion.js';
 export const SCHEMA_VERSION = 1;
 export const STORAGE_KEY = 'disc-roller.league.v1';
 export const STROKE_PLAY = Object.freeze({id:'stroke-play', version:1});
@@ -39,6 +40,7 @@ export function validateState(state){
  }
  const round=activeRound(state);if(!round||!round.holes.some(h=>h.id===state.activeHoleId)||(state.activePlayerId!==null&&!round.playerIds.includes(state.activePlayerId))||!Number.isInteger(state.preferences?.experience)||state.preferences.experience<0||state.preferences.experience>100)throw new Error('Saved selection is invalid.');
  if(state.draft){const d=state.draft;if(d.roundId!==round.id||d.playerId!==state.activePlayerId||d.holeId!==state.activeHoleId||!['disc','stability','shot','complete'].includes(d.stage)||typeof d.wildcard!=='boolean'||(d.disc!==null&&!wildcardOptions('disc').includes(d.disc))||(d.stability!==null&&!wildcardOptions('stability').includes(d.stability))||(d.shot!==null&&!wildcardOptions('shot').includes(d.shot))||(['stability','shot','complete'].includes(d.stage)&&!d.disc)||(['shot','complete'].includes(d.stage)&&!d.stability)||(d.stage==='complete'&&!d.shot))throw new Error('Saved challenge progress is invalid.');}
+ if(state.draft?.spin){const s=state.draft.spin;if(!Number.isFinite(s.startedAt)||!Number.isInteger(s.start)||s.start<0||!Number.isInteger(s.ordinal)||s.ordinal<0)throw new Error('Saved spin is invalid.');}
  return state;
 }
 export function strokeSummary(round,playerId){const scores=round.scores.filter(s=>s.playerId===playerId);return {total:scores.length?scores.reduce((n,s)=>n+s.strokes,0):null,played:scores.length,holes:round.holes.length,complete:scores.length===round.holes.length};}
@@ -56,20 +58,30 @@ export function applyCommand(input,type,payload={}){
  case 'player.select':if(state.draft&&state.draft.stage!=='complete')throw new Error('Finish this challenge before switching players.');if(!round.playerIds.includes(payload.playerId))throw new Error('Player not found.');state.activePlayerId=payload.playerId;state.draft=null;break;
  case 'hole.select':if(state.draft&&state.draft.stage!=='complete')throw new Error('Finish this challenge before switching holes.');if(!round.holes.some(h=>h.id===payload.holeId))throw new Error('Hole not found.');state.activeHoleId=payload.holeId;state.draft=null;break;
  case 'difficulty.set':if(!Number.isInteger(payload.experience)||payload.experience<0||payload.experience>100)throw new Error('Invalid difficulty.');state.preferences.experience=payload.experience;break;
- case 'challenge.start':if(state.draft&&state.draft.stage!=='complete')throw new Error('A challenge is already in progress.');state.draft={id:newId(),roundId:round.id,playerId:state.activePlayerId,holeId:state.activeHoleId,stage:'disc',wildcard:false,disc:null,stability:null,shot:null,startedAt:time};break;
+ case 'challenge.start':if(state.draft&&state.draft.stage!=='complete')throw new Error('A challenge is already in progress.');state.draft={id:newId(),roundId:round.id,playerId:state.activePlayerId,holeId:state.activeHoleId,stage:'disc',wildcard:false,disc:null,stability:null,shot:null,spin:null,startedAt:time};break;
+ case 'challenge.spin':{
+  const d=state.draft;if(!d||d.stage==='complete'||d.wildcard||d.spin)throw new Error('Cannot restart this spin.');
+  if(!Number.isInteger(payload.start)||payload.start<0||!Number.isInteger(payload.ordinal)||payload.ordinal<0)throw new Error('Invalid spin.');
+  // Older unfinished drafts have no clock: resume with Quick Stop already closed.
+  d.spin={startedAt:Date.parse(time)-(Object.hasOwn(d,'spin')?0:QUICK_STOP_DURATION),start:payload.start,ordinal:payload.ordinal};break;
+ }
  case 'challenge.choose':{
   const d=state.draft;if(!d||d.stage==='complete')throw new Error('No active reel.');
   const options=d.wildcard?wildcardOptions(d.stage):poolFor(d.stage,state.preferences.experience);if(!options.includes(payload.value))throw new Error('That option is not available.');
   if(payload.value==='WILDCARD'){d.wildcard=true;break;}
-  d[d.stage]=payload.value;d.wildcard=false;
+  d[d.stage]=payload.value;d.wildcard=false;d.spin=null;
   if(d.stage==='disc')d.stage='stability';else if(d.stage==='stability')d.stage='shot';else {d.stage='complete';round.challenges.push({id:d.id,playerId:d.playerId,holeId:d.holeId,disc:d.disc,stability:d.stability,shot:d.shot,experience:state.preferences.experience,createdAt:time});}
   break;
  }
- case 'score.set':{
-  if(!round.playerIds.includes(payload.playerId)||!round.holes.some(h=>h.id===payload.holeId))throw new Error('Score does not belong to this round.');
-  const {strokes}=payload;if(strokes!==null&&(!Number.isInteger(strokes)||strokes<1||strokes>99))throw new Error('Enter whole strokes from 1 to 99, or leave the hole blank.');
-  const existing=round.scores.find(s=>s.playerId===payload.playerId&&s.holeId===payload.holeId);
-  if(strokes===null)round.scores=round.scores.filter(s=>s!==existing);else if(existing){existing.strokes=strokes;existing.updatedAt=time;}else round.scores.push({id:newId(),playerId:payload.playerId,holeId:payload.holeId,strokes,updatedAt:time});break;
+ case 'score.set':case 'score.hole.set':{
+  const entries=type==='score.set'?[payload]:payload.scores?.map(s=>({...s,holeId:payload.holeId}));
+  if(!Array.isArray(entries)||new Set(entries.map(s=>s.playerId)).size!==entries.length)throw new Error('Invalid score entries.');
+  for(const entry of entries){
+   if(!round.playerIds.includes(entry.playerId)||!round.holes.some(h=>h.id===entry.holeId))throw new Error('Score does not belong to this round.');
+   const {strokes}=entry;if(strokes!==null&&(!Number.isInteger(strokes)||strokes<1||strokes>99))throw new Error('Enter whole strokes from 1 to 99, or leave the hole blank.');
+   const existing=round.scores.find(s=>s.playerId===entry.playerId&&s.holeId===entry.holeId);
+   if(strokes===null)round.scores=round.scores.filter(s=>s!==existing);else if(existing){existing.strokes=strokes;existing.updatedAt=time;}else round.scores.push({id:newId(),playerId:entry.playerId,holeId:entry.holeId,strokes,updatedAt:time});
+  }break;
  }
  case 'round.start':{
   if(state.draft&&state.draft.stage!=='complete')throw new Error('Finish this challenge before starting a new round.');const next=makeRound(state.players,payload.holeCount);state.rounds.push(next);state.activeRoundId=next.id;state.activeHoleId=next.holes[0].id;state.activePlayerId=state.players[0]?.id??null;state.draft=null;break;

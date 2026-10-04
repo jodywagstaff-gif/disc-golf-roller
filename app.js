@@ -1,11 +1,23 @@
 import {STORAGE_KEY,LocalRepository,freshState,applyCommand,activeRound,strokeSummary,poolFor,normalizeIndex,levelName,wildcardOptions} from './model.js';
-import {spinPlan,spinPosition,centeredIndex,SETTLE_DURATION} from './reel-motion.js';
+import {spinPlan,spinPosition,centeredIndex,SETTLE_DURATION,canQuickStop} from './reel-motion.js';
 import {BUILD_ID} from './release.js';
+import './theme.js';
 const $=id=>document.getElementById(id);
-const dialogs={scores:'scoresDialog',players:'playersDialog',help:'helpDialog','new-round':'newNightDialog'};
+const dialogs={scores:'scoresDialog',players:'playersDialog',help:'helpDialog','new-round':'newNightDialog','hole-entry':'holeDialog'};
 const views=new Set(['start','play',...Object.keys(dialogs)]);
 let repo,state,blocked=false,rolling=false,index=0,timer=null,saveQueue=Promise.resolve(),busyAction=false;
 let settleTimer=null,settling=false,motionGeneration=0,spinOrdinal=0,paintedPosition=0,lastReducedPaint=0;
+let spinAnchor=0,spinOffset=0,windowWasOpen=false;
+const spinElapsed=()=>Math.max(spinOffset+performance.now()-spinAnchor,Date.now()-(state.draft?.spin?.startedAt??Date.now()));
+function renderSpinAction(){
+ const d=state.draft;const quick=rolling&&canQuickStop(spinElapsed());
+ $('mainAction').hidden=!!d?.wildcard;$('mainAction').disabled=blocked||busyAction||settling||(rolling&&!quick);
+ $('mainAction').classList.toggle('is-rolling',quick);
+ $('actionLabel').textContent=settling?'LOCKED':!d?'ROLL':d.stage==='complete'?'ROLL AGAIN':rolling?(quick?'QUICK STOP':'LET IT SPIN'):'RESUME';
+ $('mainAction').setAttribute('aria-label',rolling?(quick?'Quick stop: catch it now':'Quick stop closed. Reel will stop automatically.'):$('actionLabel').textContent);
+ $('actionIcon').textContent=settling?'✓':rolling?'◆':'▶';
+ if(rolling&&!quick&&windowWasOpen)announce('Quick stop closed. Let it spin.');windowWasOpen=quick;
+}
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
 let currentView='start',baseView='start',scoreHoleId=null,lastMessage='',navigatingBack=false;
 const focusReturns=new Map();
@@ -65,8 +77,10 @@ function paintReel(position){
  $('reelWindow').dataset.position=String(position);$('reelWindow').dataset.center=pool[index];
 }
 function drawReel(){if(!inProgress()||state.draft.wildcard)return;index=normalizeIndex(index,poolFor(state.draft.stage,state.preferences.experience).length);paintReel(rolling||settling?paintedPosition:index);}
-function finishSpin(){
+function finishSpin(automatic=false){
  if(!rolling||busyAction||blocked||currentView!=='play'||document.hidden)return;
+ // Input-time guard: a delayed frame or synthetic/keyboard click cannot bypass it.
+ if(!automatic&&!canQuickStop(spinElapsed())){renderSpinAction();return;}
  // Catch exactly the nearest item in the last painted frame, not a later clock
  // sample. Hold it centered before accepting so the result is easy to see.
  const selectedIndex=centeredIndex(paintedPosition,poolFor(state.draft.stage,state.preferences.experience).length);
@@ -75,12 +89,17 @@ function finishSpin(){
  const generation=motionGeneration;
  settleTimer=setTimeout(()=>{settleTimer=null;if(generation!==motionGeneration||currentView!=='play'||document.hidden||state.draft?.id!==draftId||state.draft.stage!==stage)return;settling=false;choose(value);},SETTLE_DURATION);
 }
-function startTimer(){
- stopTimer();if(currentView!=='play'||document.hidden)return;rolling=true;paintedPosition=index;lastReducedPaint=0;paintReel(index);
- const plan=spinPlan(index,spinOrdinal++);const started=performance.now();const generation=motionGeneration;
- const frame=time=>{if(generation!==motionGeneration||!rolling)return;if(document.hidden||currentView!=='play'){stopTimer();renderMachine();return;}const elapsed=time-started;const position=spinPosition(plan,elapsed);
+async function startTimer(){
+ stopTimer();if(currentView!=='play'||document.hidden)return;
+ const generation=motionGeneration;
+ if(!state.draft.spin)await commit('challenge.spin',{start:index,ordinal:spinOrdinal++});
+ if(generation!==motionGeneration||currentView!=='play'||document.hidden)return;
+ const saved=state.draft.spin;const plan=spinPlan(saved.start,saved.ordinal);
+ spinOffset=Math.max(0,Date.now()-saved.startedAt);spinAnchor=performance.now();rolling=true;lastReducedPaint=0;
+ paintReel(spinPosition(plan,spinOffset));renderSpinAction();
+ const frame=time=>{if(generation!==motionGeneration||!rolling)return;if(document.hidden||currentView!=='play'){stopTimer();renderMachine();return;}const elapsed=spinElapsed();const position=spinPosition(plan,elapsed);
   if(!reducedMotion.matches||time-lastReducedPaint>=250||elapsed>=plan.duration){paintReel(reducedMotion.matches?Math.round(position):position);lastReducedPaint=time;}
-  if(elapsed>=plan.duration){finishSpin();return;}timer=requestAnimationFrame(frame);
+  renderSpinAction();if(elapsed>=plan.duration){finishSpin(true);return;}timer=requestAnimationFrame(frame);
  };timer=requestAnimationFrame(frame);
 }
 reducedMotion.addEventListener('change',()=>{if(inProgress()&&!state.draft.wildcard)drawReel();});
@@ -98,14 +117,14 @@ function syncView(){
  const dialog=dialogs[currentView]?$(dialogs[currentView]):null;
  if(dialog&&!dialog.open){dialog.showModal();dialog.scrollTop=0;dialog.querySelector('.close-button').focus({preventScroll:true});}
  if(!dialog&&previous!==currentView){const target=dialogs[previous]&&focusReturns.get(previous)?$(focusReturns.get(previous)):currentView==='play'?$('mainAction'):$('startButton');(target&&target.getClientRects().length&&!target.disabled?target:currentView==='play'?$('mainAction'):$('startButton')).focus({preventScroll:true});}
- notice(lastMessage);window.scrollTo(0,0);
+ if(currentView==='hole-entry'&&previous!==currentView){scoreHoleId=history.state?.scoreHoleId||scoreHoleId;renderHoleWheels();}notice(lastMessage);window.scrollTo(0,0);
 }
 function navigate(view,{replace=false}={}){
  if(currentView===view)return;
  if(dialogs[view]){focusReturns.set(view,document.activeElement?.id||null);if(view==='scores')scoreHoleId=state.activeHoleId;render();}
  const nextBase=dialogs[view]?baseView:view;
  const depth=replace?(history.state?.depth??0):(history.state?.rollerUI?history.state.depth:0)+1;
- history[replace?'replaceState':'pushState']({rollerUI:true,base:nextBase,depth},'', '#'+view);syncView();
+ history[replace?'replaceState':'pushState']({rollerUI:true,base:nextBase,depth,scoreHoleId},'', '#'+view);syncView();
 }
 function back(){if(navigatingBack)return;navigatingBack=true;if(history.state?.rollerUI&&history.state.depth>0)history.back();else navigate(baseView,{replace:true});}
 window.addEventListener('popstate',syncView);window.addEventListener('hashchange',()=>{if(location.hash.slice(1)!==currentView)syncView();});
@@ -125,7 +144,7 @@ function renderMachine(){
  if(busy&&!d.wildcard){$('reelStage').textContent=({disc:'01 / DISC TYPE',stability:'02 / STABILITY',shot:'03 / SHOT TYPE'})[d.stage];drawReel();}
  if(d?.wildcard){$('wildTitle').textContent=({disc:'Pick your disc.',stability:'Pick stability.',shot:'Pick your shot.'})[d.stage];$('wildOptions').replaceChildren(...wildcardOptions(d.stage).map(value=>{const button=document.createElement('button');button.type='button';button.textContent=value;button.disabled=blocked||busyAction;button.addEventListener('click',()=>choose(value));return button;}));}
  if(d?.stage==='complete'){$('completePlayer').textContent=current?current.name+' · Hole '+hole().number:'Go throw it.';$('finalChallenge').replaceChildren(...['disc','stability','shot'].map(stage=>{const row=document.createElement('div');const label=document.createElement('span');label.textContent=stage.toUpperCase();const value=document.createElement('strong');value.textContent=d[stage];row.append(label,value);return row;}));}
- $('mainAction').hidden=!!d?.wildcard;$('mainAction').disabled=blocked||busyAction||settling;$('mainAction').classList.toggle('is-rolling',rolling);$('actionLabel').textContent=settling?'LOCKED':!d?'ROLL':d.stage==='complete'?'ROLL AGAIN':rolling?'STOP':'RESUME';$('actionIcon').textContent=settling?'✓':rolling?'■':'↗';
+ renderSpinAction();
  $('startButton').firstChild.textContent=d?'CONTINUE ':'START ';
  $('activeHole').replaceChildren(...round.holes.map(h=>option(h.id,'Hole '+h.number)));$('activeHole').value=state.activeHoleId;$('activeHole').disabled=busy||blocked||busyAction;
  $('difficulty').value=state.preferences.experience;$('difficultyName').textContent=levelName(state.preferences.experience);$('difficulty').disabled=blocked||busyAction;
@@ -139,7 +158,45 @@ function renderPlayers(){
  $('playerName').disabled=!!inProgress()||blocked||busyAction;$('playerForm').querySelector('button').disabled=!!inProgress()||blocked||busyAction;
 }
 function selectedScore(){const round=activeRound(state);if(!round.holes.some(h=>h.id===scoreHoleId))scoreHoleId=state.activeHoleId;return round.holes.find(h=>h.id===scoreHoleId);}
+function openHole(holeId,playerId){
+ scoreHoleId=holeId;renderScores();navigate('hole-entry');renderHoleWheels();
+ if(playerId){const wheel=[...document.querySelectorAll('.stroke-wheel')].find(e=>e.dataset.player===playerId);wheel?.focus();}
+}
+function renderOverview(){
+ const round=activeRound(state);const selected=selectedScore();const grid=$('scoreGrid');const scroll=grid.parentElement.scrollLeft;
+ const head=document.createElement('thead');const row=document.createElement('tr');const label=document.createElement('th');label.scope='col';label.textContent='PLAYER';row.append(label);
+ for(const hole of round.holes){const th=document.createElement('th');th.scope='col';const button=document.createElement('button');button.textContent=hole.number;button.setAttribute('aria-label','Enter scores for hole '+hole.number);button.classList.toggle('selected-hole',hole.id===selected.id);button.addEventListener('click',()=>openHole(hole.id));th.append(button);row.append(th);}head.append(row);
+ const body=document.createElement('tbody');const totals=[];
+ for(const id of round.playerIds){const player=state.players.find(p=>p.id===id);const tr=document.createElement('tr');const name=document.createElement('th');name.scope='row';name.textContent=player.name;tr.append(name);
+  for(const hole of round.holes){const td=document.createElement('td');const value=round.scores.find(s=>s.playerId===id&&s.holeId===hole.id)?.strokes;const button=document.createElement('button');button.textContent=value??'—';button.classList.toggle('recorded',value!==undefined);button.setAttribute('aria-label',`${player.name}, hole ${hole.number}: ${value??'unplayed'}. Edit score`);button.addEventListener('click',()=>openHole(hole.id,id));td.append(button);tr.append(td);}body.append(tr);
+  const summary=strokeSummary(round,id);const card=document.createElement('div');const who=document.createElement('strong');who.textContent=player.name;const total=document.createElement('b');total.textContent=summary.total??'—';const status=document.createElement('small');status.textContent=`${summary.played}/${summary.holes} holes${summary.complete?' · complete':summary.played?' · partial':''}`;card.append(who,total,status);totals.push(card);
+ }
+ grid.replaceChildren(head,body);grid.parentElement.scrollLeft=scroll;$('roundTotals').replaceChildren(...totals);
+ const complete=round.holes.filter(h=>round.playerIds.length&&round.playerIds.every(id=>round.scores.some(s=>s.playerId===id&&s.holeId===h.id))).length;
+ $('roundProgress').textContent=`${complete} / ${round.holes.length} holes complete`;$('roundOverview').hidden=!round.playerIds.length;$('editCurrentHole').hidden=!round.playerIds.length;
+ $('editCurrentHole').textContent='Hole '+selected.number+' · Open stroke wheels';
+}
+function renderHoleWheels(){
+ const round=activeRound(state);const selected=selectedScore();$('holeTitle').textContent='Hole '+selected.number;$('holeWheels').replaceChildren();
+ for(const id of round.playerIds){
+  const player=state.players.find(p=>p.id===id);const card=document.createElement('section');card.className='wheel-card';const name=document.createElement('h3');name.textContent=player.name;
+  const wheel=document.createElement('div');wheel.className='stroke-wheel';wheel.tabIndex=0;wheel.dataset.player=id;wheel.setAttribute('role','listbox');wheel.setAttribute('aria-label',player.name+', hole '+selected.number+', strokes');
+  for(let value=0;value<=99;value++){const item=document.createElement('div');item.className='wheel-option';item.id='wheel-'+id+'-'+value;item.setAttribute('role','option');item.textContent=value||'Unplayed';item.addEventListener('click',()=>{wheel.scrollTop=value*48;sync();});wheel.append(item);}
+  function sync(){const value=Math.max(0,Math.min(99,Math.round(wheel.scrollTop/48)));wheel.dataset.value=String(value);wheel.setAttribute('aria-activedescendant','wheel-'+id+'-'+value);for(let i=0;i<wheel.children.length;i++)wheel.children[i].setAttribute('aria-selected',String(i===value));}
+  wheel.addEventListener('scroll',sync,{passive:true});wheel.addEventListener('keydown',event=>{const current=Number(wheel.dataset.value);let value;if(event.key==='ArrowDown')value=current+1;else if(event.key==='ArrowUp')value=current-1;else if(event.key==='Home')value=0;else if(event.key==='End')value=99;else if(event.key==='PageDown')value=current+10;else if(event.key==='PageUp')value=current-10;else return;event.preventDefault();wheel.scrollTop=Math.max(0,Math.min(99,value))*48;sync();});
+  const frame=document.createElement('div');frame.className='wheel-frame';frame.append(wheel);card.append(name,frame);$('holeWheels').append(card);
+  wheel.scrollTop=(round.scores.find(s=>s.playerId===id&&s.holeId===selected.id)?.strokes??0)*48;sync();
+ }
+ $('saveHole').disabled=blocked||!round.playerIds.length;
+}
+$('editCurrentHole').addEventListener('click',()=>openHole(selectedScore().id));
+$('saveHole').addEventListener('click',async()=>{
+ if(busyAction||blocked)return;busyAction=true;$('saveHole').disabled=true;
+ const scores=[...document.querySelectorAll('.stroke-wheel')].map(w=>({playerId:w.dataset.player,strokes:Math.max(0,Math.min(99,Math.round(w.scrollTop/48)))||null}));
+ try{await commit('score.hole.set',{holeId:scoreHoleId,scores});notice('');render();back();announce('Hole scores saved.');}catch{}finally{busyAction=false;$('saveHole').disabled=blocked;}
+});
 function renderScores(){
+ renderOverview();
  const round=activeRound(state);const scoring=selectedScore();$('scoreDescription').textContent=`Round ${state.rounds.indexOf(round)+1} · ${round.holes.length} holes · Strokes`;$('scoreEmpty').hidden=round.playerIds.length>0;
  $('scoreHole').replaceChildren(...round.holes.map(h=>option(h.id,'Hole '+h.number)));$('scoreHole').value=scoring.id;$('previousScoreHole').disabled=scoring.number===1;$('nextScoreHole').disabled=scoring.number===round.holes.length;
  $('scoreCards').replaceChildren(...round.playerIds.map(playerId=>{
@@ -153,11 +210,11 @@ function renderScores(){
   stepper.append(minus,input,plus);card.append(header,stepper);return card;
  }));updateTotals();
 }
-function updateTotals(){for(const cell of document.querySelectorAll('[data-total]')){const summary=strokeSummary(activeRound(state),cell.dataset.total);const b=document.createElement('b');b.textContent=summary.total??'—';const small=document.createElement('small');small.textContent=`${summary.played}/${summary.holes} holes`+(summary.played&&!summary.complete?' · partial':'');cell.replaceChildren(b,document.createTextNode(' total'),small);}}
+function updateTotals(){renderOverview();for(const cell of document.querySelectorAll('[data-total]')){const summary=strokeSummary(activeRound(state),cell.dataset.total);const b=document.createElement('b');b.textContent=summary.total??'—';const small=document.createElement('small');small.textContent=`${summary.played}/${summary.holes} holes`+(summary.played&&!summary.complete?' · partial':'');cell.replaceChildren(b,document.createTextNode(' total'),small);}}
 function renderHistory(){const round=activeRound(state);const entries=round.challenges.slice().reverse();$('historyEmpty').hidden=!!entries.length;$('historyList').replaceChildren(...entries.slice(0,30).map(entry=>{const li=document.createElement('li');li.className='history-item';const who=document.createElement('span');who.className='history-person';who.textContent=state.players.find(p=>p.id===entry.playerId)?.name??'Free play';const detail=document.createElement('small');detail.textContent='Hole '+round.holes.find(h=>h.id===entry.holeId).number+' · '+levelName(entry.experience).toLowerCase();who.append(detail);const chips=document.createElement('span');chips.className='history-challenge';for(const value of [entry.disc,entry.stability,entry.shot]){const chip=document.createElement('span');chip.className='challenge-chip';chip.textContent=value;chips.append(chip);}li.append(who,chips);return li;}));}
 function render(){renderMachine();renderPlayers();renderScores();renderHistory();$('roundPicker').replaceChildren(...state.rounds.map((r,i)=>option(r.id,'Round '+(i+1)+' · '+r.holes.length+' holes')));$('roundPicker').value=state.activeRoundId;$('roundPicker').disabled=!!inProgress()||blocked||busyAction;}
-async function choose(value){if(!inProgress()||busyAction||blocked)return;stopTimer();busyAction=true;renderMachine();try{await commit('challenge.choose',{value});index=0;if(inProgress()&&!state.draft.wildcard&&currentView==='play')startTimer();const d=state.draft;if(d.stage==='complete'){announce(`Challenge locked: ${d.disc}, ${d.stability}, ${d.shot}.`);$('gameDisplay').classList.add('celebrate');setTimeout(()=>$('gameDisplay').classList.remove('celebrate'),550);}else announce(d.wildcard?'Wild card. Choose your '+d.stage+'.':value+' locked. Stop the '+d.stage+' reel next.');}catch{}finally{busyAction=false;render();if(currentView==='play')(state.draft?.wildcard?$('wildOptions').querySelector('button'):$('mainAction'))?.focus({preventScroll:true});}}
-$('mainAction').addEventListener('click',async()=>{if(blocked||busyAction||settling)return;if(rolling){finishSpin();return;}if(inProgress()){startTimer();renderMachine();announce('Reel resumed. It will stop automatically, or tap Stop to catch it early.');return;}busyAction=true;renderMachine();try{await commit('challenge.start');index=0;startTimer();announce('Disc reel started. It will stop automatically, or tap Stop to catch it early.');}catch{}finally{busyAction=false;render();}});
+async function choose(value){if(!inProgress()||busyAction||blocked)return;stopTimer();busyAction=true;renderMachine();try{await commit('challenge.choose',{value});index=0;if(inProgress()&&!state.draft.wildcard&&currentView==='play')await startTimer();const d=state.draft;if(d.stage==='complete'){announce(`Challenge locked: ${d.disc}, ${d.stability}, ${d.shot}.`);$('gameDisplay').classList.add('celebrate');setTimeout(()=>$('gameDisplay').classList.remove('celebrate'),550);}else announce(d.wildcard?'Wild card. Choose your '+d.stage+'.':value+' locked. Stop the '+d.stage+' reel next.');}catch{}finally{busyAction=false;render();if(currentView==='play')(state.draft?.wildcard?$('wildOptions').querySelector('button'):$('mainAction'))?.focus({preventScroll:true});}}
+$('mainAction').addEventListener('click',async()=>{if(blocked||busyAction||settling)return;if(rolling){finishSpin();return;}if(inProgress()){busyAction=true;try{await startTimer();}catch{}finally{busyAction=false;renderMachine();}return;}busyAction=true;renderMachine();try{await commit('challenge.start');index=0;await startTimer();announce('Disc reel started. Quick stop is available for the first third.');}catch{}finally{busyAction=false;render();}});
 $('difficulty').addEventListener('input',()=>{$('difficultyName').textContent=levelName(Number($('difficulty').value));});
 $('difficulty').addEventListener('change',async()=>{const experience=Number($('difficulty').value);stopTimer();busyAction=true;try{await commit('difficulty.set',{experience});if(inProgress()&&!state.draft.wildcard)index=normalizeIndex(index,poolFor(state.draft.stage,experience).length);}catch{}finally{busyAction=false;renderMachine();}});
 $('playerForm').addEventListener('submit',async event=>{event.preventDefault();const name=$('playerName').value;$('playerError').hidden=true;try{applyCommand(state,'player.add',{name});await commit('player.add',{name});$('playerName').value='';render();$('playerName').focus();announce(name.trim()+' added.');}catch(error){$('playerError').textContent=error.message;$('playerError').hidden=false;}});

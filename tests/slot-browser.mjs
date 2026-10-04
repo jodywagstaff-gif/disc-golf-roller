@@ -9,7 +9,7 @@ const contexts=[];
 await fs.mkdir('review',{recursive:true});
 async function page(reduced='no-preference'){const c=await browser.newContext({viewport:{width:390,height:740},reducedMotion:reduced});contexts.push(c);const p=await c.newPage();p.on('pageerror',e=>report.errors.push(e.message));await p.goto(base+'/#play');return p;}
 const saved=p=>p.evaluate(()=>JSON.parse(localStorage.getItem('disc-roller.league.v1')));
-async function start(p){await p.locator('#mainAction').click();await p.waitForFunction(()=>document.querySelector('#actionLabel').textContent==='STOP');}
+async function start(p){await p.locator('#mainAction').click();await p.waitForFunction(()=>['QUICK STOP','LET IT SPIN','LOCKED'].includes(document.querySelector('#actionLabel').textContent));}
 async function waitStage(p,stage){await p.waitForFunction(stage=>JSON.parse(localStorage.getItem('disc-roller.league.v1')).draft.stage===stage,stage);}
 async function fit(p,label){const d=await p.evaluate(()=>{const b=document.querySelector('#gameDisplay');return {width:innerWidth,height:innerHeight,scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight,displayHeight:b.clientHeight,displayScroll:b.scrollHeight}});assert.ok(d.scrollWidth<=d.width&&d.scrollHeight<=d.height+1,JSON.stringify(d));assert.ok(d.displayScroll<=d.displayHeight+2,JSON.stringify(d));report.layouts.push({label,...d});}
 try{
