@@ -1,8 +1,11 @@
 import {STORAGE_KEY,LocalRepository,freshState,applyCommand,activeRound,strokeSummary,poolFor,normalizeIndex,levelName,wildcardOptions} from './model.js';
+import {spinPlan,spinPosition,centeredIndex,SETTLE_DURATION} from './reel-motion.js';
 const $=id=>document.getElementById(id);
 const dialogs={scores:'scoresDialog',players:'playersDialog',help:'helpDialog','new-round':'newNightDialog'};
 const views=new Set(['start','play',...Object.keys(dialogs)]);
 let repo,state,blocked=false,rolling=false,index=0,timer=null,saveQueue=Promise.resolve(),busyAction=false;
+let settleTimer=null,settling=false,motionGeneration=0,spinOrdinal=0,paintedPosition=0,lastReducedPaint=0;
+const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
 let currentView='start',baseView='start',scoreHoleId=null,lastMessage='',navigatingBack=false;
 const focusReturns=new Map();
 const announce=text=>{$('announcer').textContent=text;};
@@ -19,9 +22,38 @@ function commit(type,payload={}){
   catch(error){stopTimer();notice(error.message.includes('another tab')?error.message:'Could not save this change. Previous saved data is intact. Export a backup, check storage, then reload.');$('saveStatus').textContent='Change not saved';throw error;}
  });return saveQueue;
 }
-function stopTimer(){clearInterval(timer);timer=null;rolling=false;}
-function drawReel(){if(!inProgress()||state.draft.wildcard)return;const pool=poolFor(state.draft.stage,state.preferences.experience);index=normalizeIndex(index,pool.length);$('reelText').textContent=pool[index]==='WILDCARD'?'WILD CARD':pool[index];}
-function startTimer(){stopTimer();if(currentView!=='play'||document.hidden)return;rolling=true;drawReel();timer=setInterval(()=>{index=(index+1)%poolFor(state.draft.stage,state.preferences.experience).length;drawReel();},60);}
+function stopTimer(){cancelAnimationFrame(timer);clearTimeout(settleTimer);timer=null;settleTimer=null;rolling=false;settling=false;motionGeneration++;}
+function paintReel(position){
+ if(!inProgress()||state.draft.wildcard)return;
+ const pool=poolFor(state.draft.stage,state.preferences.experience);paintedPosition=position;index=centeredIndex(position,pool.length);
+ $('reelText').textContent=pool[index]==='WILDCARD'?'WILD CARD':pool[index];
+ $('reelWindow').hidden=reducedMotion.matches;$('reelText').classList.toggle('sr-only',!reducedMotion.matches);
+ const track=$('reelTrack');while(track.children.length<7){const row=document.createElement('div');row.className='reel-row';track.append(row);}
+ const base=Math.floor(position);for(let i=0;i<7;i++){const item=pool[normalizeIndex(base+i-3,pool.length)];const row=track.children[i];row.textContent=item==='WILDCARD'?'WILD CARD':item;row.classList.toggle('centered',base+i-3===Math.round(position));}
+ const height=track.firstElementChild.getBoundingClientRect().height||80;
+ track.style.transform=`translateY(${-(position-base+3.5)*height}px)`;
+ $('reelWindow').dataset.position=String(position);$('reelWindow').dataset.center=pool[index];
+}
+function drawReel(){if(!inProgress()||state.draft.wildcard)return;index=normalizeIndex(index,poolFor(state.draft.stage,state.preferences.experience).length);paintReel(rolling||settling?paintedPosition:index);}
+function finishSpin(){
+ if(!rolling||busyAction||blocked||currentView!=='play'||document.hidden)return;
+ // Catch exactly the nearest item in the last painted frame, not a later clock
+ // sample. Hold it centered before accepting so the result is easy to see.
+ const selectedIndex=centeredIndex(paintedPosition,poolFor(state.draft.stage,state.preferences.experience).length);
+ const value=poolFor(state.draft.stage,state.preferences.experience)[selectedIndex];const draftId=state.draft.id;const stage=state.draft.stage;
+ stopTimer();index=selectedIndex;paintedPosition=selectedIndex;settling=true;renderMachine();
+ const generation=motionGeneration;
+ settleTimer=setTimeout(()=>{settleTimer=null;if(generation!==motionGeneration||currentView!=='play'||document.hidden||state.draft?.id!==draftId||state.draft.stage!==stage)return;settling=false;choose(value);},SETTLE_DURATION);
+}
+function startTimer(){
+ stopTimer();if(currentView!=='play'||document.hidden)return;rolling=true;paintedPosition=index;lastReducedPaint=0;paintReel(index);
+ const plan=spinPlan(index,spinOrdinal++);const started=performance.now();const generation=motionGeneration;
+ const frame=time=>{if(generation!==motionGeneration||!rolling)return;if(document.hidden||currentView!=='play'){stopTimer();renderMachine();return;}const elapsed=time-started;const position=spinPosition(plan,elapsed);
+  if(!reducedMotion.matches||time-lastReducedPaint>=250||elapsed>=plan.duration){paintReel(reducedMotion.matches?Math.round(position):position);lastReducedPaint=time;}
+  if(elapsed>=plan.duration){finishSpin();return;}timer=requestAnimationFrame(frame);
+ };timer=requestAnimationFrame(frame);
+}
+reducedMotion.addEventListener('change',()=>{if(inProgress()&&!state.draft.wildcard)drawReel();});
 
 // URL/history state controls screens only, not league data. Back, Escape and
 // Close share the same path; native dialogs provide modal focus containment.
@@ -62,7 +94,7 @@ function renderMachine(){
  if(busy&&!d.wildcard){$('reelStage').textContent=({disc:'01 / DISC TYPE',stability:'02 / STABILITY',shot:'03 / SHOT TYPE'})[d.stage];drawReel();}
  if(d?.wildcard){$('wildTitle').textContent=({disc:'Pick your disc.',stability:'Pick stability.',shot:'Pick your shot.'})[d.stage];$('wildOptions').replaceChildren(...wildcardOptions(d.stage).map(value=>{const button=document.createElement('button');button.type='button';button.textContent=value;button.disabled=blocked||busyAction;button.addEventListener('click',()=>choose(value));return button;}));}
  if(d?.stage==='complete'){$('completePlayer').textContent=current?current.name+' · Hole '+hole().number:'Go throw it.';$('finalChallenge').replaceChildren(...['disc','stability','shot'].map(stage=>{const row=document.createElement('div');const label=document.createElement('span');label.textContent=stage.toUpperCase();const value=document.createElement('strong');value.textContent=d[stage];row.append(label,value);return row;}));}
- $('mainAction').hidden=!!d?.wildcard;$('mainAction').disabled=blocked||busyAction;$('mainAction').classList.toggle('is-rolling',rolling);$('actionLabel').textContent=!d?'ROLL':d.stage==='complete'?'ROLL AGAIN':rolling?'STOP':'RESUME';$('actionIcon').textContent=rolling?'■':'↗';
+ $('mainAction').hidden=!!d?.wildcard;$('mainAction').disabled=blocked||busyAction||settling;$('mainAction').classList.toggle('is-rolling',rolling);$('actionLabel').textContent=settling?'LOCKED':!d?'ROLL':d.stage==='complete'?'ROLL AGAIN':rolling?'STOP':'RESUME';$('actionIcon').textContent=settling?'✓':rolling?'■':'↗';
  $('startButton').firstChild.textContent=d?'CONTINUE ':'START ';
  $('activeHole').replaceChildren(...round.holes.map(h=>option(h.id,'Hole '+h.number)));$('activeHole').value=state.activeHoleId;$('activeHole').disabled=busy||blocked||busyAction;
  $('difficulty').value=state.preferences.experience;$('difficultyName').textContent=levelName(state.preferences.experience);$('difficulty').disabled=blocked||busyAction;
@@ -94,7 +126,7 @@ function updateTotals(){for(const cell of document.querySelectorAll('[data-total
 function renderHistory(){const round=activeRound(state);const entries=round.challenges.slice().reverse();$('historyEmpty').hidden=!!entries.length;$('historyList').replaceChildren(...entries.slice(0,30).map(entry=>{const li=document.createElement('li');li.className='history-item';const who=document.createElement('span');who.className='history-person';who.textContent=state.players.find(p=>p.id===entry.playerId)?.name??'Free play';const detail=document.createElement('small');detail.textContent='Hole '+round.holes.find(h=>h.id===entry.holeId).number+' · '+levelName(entry.experience).toLowerCase();who.append(detail);const chips=document.createElement('span');chips.className='history-challenge';for(const value of [entry.disc,entry.stability,entry.shot]){const chip=document.createElement('span');chip.className='challenge-chip';chip.textContent=value;chips.append(chip);}li.append(who,chips);return li;}));}
 function render(){renderMachine();renderPlayers();renderScores();renderHistory();$('roundPicker').replaceChildren(...state.rounds.map((r,i)=>option(r.id,'Round '+(i+1)+' · '+r.holes.length+' holes')));$('roundPicker').value=state.activeRoundId;$('roundPicker').disabled=!!inProgress()||blocked||busyAction;}
 async function choose(value){if(!inProgress()||busyAction||blocked)return;stopTimer();busyAction=true;renderMachine();try{await commit('challenge.choose',{value});index=0;if(inProgress()&&!state.draft.wildcard&&currentView==='play')startTimer();const d=state.draft;if(d.stage==='complete'){announce(`Challenge locked: ${d.disc}, ${d.stability}, ${d.shot}.`);$('gameDisplay').classList.add('celebrate');setTimeout(()=>$('gameDisplay').classList.remove('celebrate'),550);}else announce(d.wildcard?'Wild card. Choose your '+d.stage+'.':value+' locked. Stop the '+d.stage+' reel next.');}catch{}finally{busyAction=false;render();if(currentView==='play')(state.draft?.wildcard?$('wildOptions').querySelector('button'):$('mainAction'))?.focus({preventScroll:true});}}
-$('mainAction').addEventListener('click',async()=>{if(blocked||busyAction)return;if(rolling){await choose(poolFor(state.draft.stage,state.preferences.experience)[index]);return;}if(inProgress()){startTimer();renderMachine();announce('Reel resumed.');return;}busyAction=true;renderMachine();try{await commit('challenge.start');index=0;startTimer();announce('Disc reel started. Tap to stop.');}catch{}finally{busyAction=false;render();}});
+$('mainAction').addEventListener('click',async()=>{if(blocked||busyAction||settling)return;if(rolling){finishSpin();return;}if(inProgress()){startTimer();renderMachine();announce('Reel resumed. It will stop automatically, or tap Stop to catch it early.');return;}busyAction=true;renderMachine();try{await commit('challenge.start');index=0;startTimer();announce('Disc reel started. It will stop automatically, or tap Stop to catch it early.');}catch{}finally{busyAction=false;render();}});
 $('difficulty').addEventListener('input',()=>{$('difficultyName').textContent=levelName(Number($('difficulty').value));});
 $('difficulty').addEventListener('change',async()=>{const experience=Number($('difficulty').value);stopTimer();busyAction=true;try{await commit('difficulty.set',{experience});if(inProgress()&&!state.draft.wildcard)index=normalizeIndex(index,poolFor(state.draft.stage,experience).length);}catch{}finally{busyAction=false;renderMachine();}});
 $('playerForm').addEventListener('submit',async event=>{event.preventDefault();const name=$('playerName').value;$('playerError').hidden=true;try{applyCommand(state,'player.add',{name});await commit('player.add',{name});$('playerName').value='';render();$('playerName').focus();announce(name.trim()+' added.');}catch(error){$('playerError').textContent=error.message;$('playerError').hidden=false;}});
@@ -107,7 +139,8 @@ $('confirmNight').addEventListener('click',async()=>{if(busyAction)return;busyAc
 $('exportButton').addEventListener('click',()=>{let content;try{content=blocked?(repo?.raw()??'No readable stored data'):JSON.stringify({format:'disc-roller-backup',exportedAt:new Date().toISOString(),state},null,2);}catch{notice('Browser storage could not be read for export.');return;}const url=URL.createObjectURL(new Blob([content],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='disc-roller-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
 function connection(){$('connectionStatus').textContent=navigator.onLine?'LOCAL':'OFFLINE';}window.addEventListener('online',connection);window.addEventListener('offline',connection);
 window.addEventListener('storage',event=>{if(event.key!==STORAGE_KEY)return;stopTimer();blocked=true;notice('This round changed in another tab. Reload to continue with the latest scores.');render();});
-document.addEventListener('visibilitychange',()=>{if(document.hidden&&rolling){stopTimer();renderMachine();}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&(rolling||settling)){stopTimer();renderMachine();}});
+window.addEventListener('pagehide',stopTimer);
 if(!history.state?.rollerUI){const requested=location.hash.slice(1);const view=views.has(requested)?requested:'start';history.replaceState({rollerUI:true,base:dialogs[view]?'play':view,depth:0},'','#'+view);}
 render();connection();syncView();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').then(async registration=>{await navigator.serviceWorker.ready;$('offlineStatus').textContent='Ready for offline play';registration.addEventListener('updatefound',()=>{const worker=registration.installing;worker?.addEventListener('statechange',()=>{if(worker.state==='installed'&&navigator.serviceWorker.controller)$('offlineStatus').textContent='Update ready · close all app tabs to apply';});});}).catch(()=>{$('offlineStatus').textContent='Offline setup unavailable · keep this tab open';});else $('offlineStatus').textContent='Offline setup unavailable in this browser';

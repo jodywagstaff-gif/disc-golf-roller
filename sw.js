@@ -1,5 +1,5 @@
-const CACHE='disc-roller-shell-v3-1';
-const SHELL=['./','./index.html','./style.css','./app.js','./model.js','./manifest.webmanifest','./assets/icon.svg','./assets/course.svg','./assets/press-start-2p.woff2'];
+const CACHE='disc-roller-shell-v4-1';
+const SHELL=['./','./index.html','./style.css','./app.js','./model.js','./reel-motion.js','./manifest.webmanifest','./assets/icon.svg','./assets/course.svg','./assets/press-start-2p.woff2'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL))));
 // Do not force an update into an ongoing round. New versions activate after all
 // older app tabs close. A cache contains only the public app, never player data.
