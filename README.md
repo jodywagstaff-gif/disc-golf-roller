@@ -17,6 +17,8 @@ The build copies an explicit allowlist of public app assets to `dist/`. Tests, a
 
 Optional browser tests use Playwright. Install it in your development environment, start the local server, then run `node tests/browser.mjs`. `PLAYWRIGHT_MODULE` can point to an existing Playwright package; `CHROME_PATH` can select installed Chrome. `TEST_URL` changes the target. Tests create isolated browser contexts with fictional players only. Output is saved under ignored `review/`.
 
+`node tests/slot-browser.mjs` checks reel behavior and layouts. `node tests/update-browser.mjs` starts its own isolated server and tests upgrades with multiple tabs, an active spin, saved scores and offline operation. It downloads the exact c764a9c and 649e4a5 public source fixtures from GitHub unless already present in `review/upgrade-fixtures/`; it never uses an existing browser profile.
+
 ## Play and scoring
 
 - Free play is the default. Start, then Roll. No player names or score settings are required.
@@ -39,7 +41,9 @@ Export a JSON backup from the Scores panel. Browser data is not a permanent serv
 
 Revision checks plus Web Locks (where available) guard against competing tabs. Changes in another tab stop editing until reload. Without Web Locks the fallback revision check is not a complete simultaneous-write guarantee; use one tab. Multi-phone synchronization is **not implemented**.
 
-The app shell and bundled font are cached by a service worker after an online visit. Wait for **Ready for offline play** before relying on it. The browser must support service workers and retain its cache. An app update waits for old tabs to close, protecting an ongoing round. Bump the cache version in `sw.js` for each asset release. The SVG manifest icon is adequate for this preview; platform-specific install icons and real iOS testing are follow-up work.
+The app shell and bundled font are cached by a service worker after an online visit. Wait for **Ready for offline play** before relying on it. The browser must support service workers and retain its cache. A completed update activates for the next navigation without reloading open games. Help offers **Check for updates** and an explicit reload button; reload waits until the current challenge is complete and pending saves finish. The splash also shows an update button. Existing scores stay in localStorage. Old public shell caches are retained; no player data is stored in them. Bump the cache version in `sw.js` for each asset release. The build stamps `release.js` and `version.json` with the deployment commit so an open app can distinguish its loaded version from the server. The SVG manifest icon is adequate for this preview; platform-specific install icons and real iOS testing are follow-up work.
+
+If an older installed version has no update button, open it online, allow a few seconds for its worker to update, and reload after finishing the current challenge. A second reload may be needed if the first installed the update. Do not clear site data to update: that would delete local scores. Other open tabs are never forcibly reloaded.
 
 ## Architecture and future modes
 

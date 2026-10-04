@@ -1,5 +1,6 @@
 import {STORAGE_KEY,LocalRepository,freshState,applyCommand,activeRound,strokeSummary,poolFor,normalizeIndex,levelName,wildcardOptions} from './model.js';
 import {spinPlan,spinPosition,centeredIndex,SETTLE_DURATION} from './reel-motion.js';
+import {BUILD_ID} from './release.js';
 const $=id=>document.getElementById(id);
 const dialogs={scores:'scoresDialog',players:'playersDialog',help:'helpDialog','new-round':'newNightDialog'};
 const views=new Set(['start','play',...Object.keys(dialogs)]);
@@ -8,6 +9,35 @@ let settleTimer=null,settling=false,motionGeneration=0,spinOrdinal=0,paintedPosi
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
 let currentView='start',baseView='start',scoreHoleId=null,lastMessage='',navigatingBack=false;
 const focusReturns=new Map();
+let updateRegistration=null,updateAvailable=false,updateReady=false,checkingUpdate=false,updateMessage='Updates keep your saved scores.';
+function renderUpdate(){
+ const unsafe=!!inProgress()||rolling||settling||busyAction;
+ for(const id of ['splashUpdate','applyUpdate']){$(id).hidden=!updateAvailable;$(id).disabled=!updateReady||unsafe;}
+ $('openHelp').classList.toggle('has-update',updateAvailable);
+ $('updateStatus').textContent=updateAvailable?(unsafe?'Update available. Finish the current challenge, then reload here.':updateReady?'Update ready. Reload to use it; your saved scores stay on this device.':'Downloading update. Keep this tab open.'):updateMessage;
+ $('checkUpdate').disabled=checkingUpdate;
+}
+async function checkUpdate(manual=false){
+ if(checkingUpdate)return;checkingUpdate=true;renderUpdate();
+ try{
+  if(manual&&updateRegistration)await updateRegistration.update();
+  const response=await fetch('./version.json',{cache:'no-store'});if(!response.ok)throw new Error('Version unavailable');
+  const latest=(await response.json()).commit;if(typeof latest!=='string')throw new Error('Invalid version');
+  updateAvailable=latest!==BUILD_ID;
+  // Read through the active worker to ensure the next navigation has this release.
+  const shell=await fetch('./release.js',{cache:'no-store'});
+  updateReady=shell.ok&&(await shell.text()).includes(JSON.stringify(latest));
+  updateMessage='You have the latest version ('+BUILD_ID.slice(0,7)+').';
+ }catch{updateMessage='Could not check for updates. Try again when online.';}
+ finally{checkingUpdate=false;renderUpdate();}
+}
+async function applyUpdate(){
+ if(!updateAvailable||!updateReady||inProgress()||rolling||settling||busyAction)return;
+ document.activeElement?.blur();
+ try{await saveQueue;}catch{notice('A change was not saved. Export a backup from Scores before reloading.');return;}
+ if(inProgress()||rolling||settling||busyAction)return;
+ location.reload();
+}
 const announce=text=>{$('announcer').textContent=text;};
 function notice(text){lastMessage=text;$('notice').textContent=text;$('notice').hidden=!text||!!document.querySelector('dialog[open]');for(const dialog of document.querySelectorAll('dialog')){let note=dialog.querySelector('.sheet-notice');if(!note){note=document.createElement('p');note.className='sheet-notice';note.setAttribute('role','alert');dialog.querySelector('.sheet-body').prepend(note);}note.textContent=text;note.hidden=!text;}}
 try{repo=new LocalRepository(localStorage);state=repo.load()??freshState();}catch{state=freshState();blocked=true;notice('Saved data could not be opened. Export a backup from Scores before troubleshooting. Existing data has not been replaced.');}
@@ -86,6 +116,7 @@ $('splashHelp').addEventListener('click',()=>navigate('help'));
 for(const [id,view] of [['openScores','scores'],['openPlayers','players'],['playerContext','players'],['openHelp','help']])$(id).addEventListener('click',()=>navigate(view));
 
 function renderMachine(){
+ renderUpdate();
  const d=state.draft;const current=activePlayer();const round=activeRound(state);const busy=!!inProgress();
  $('currentPlayerLabel').textContent=current?.name??'Free play';$('currentPlayerLabel').title=current?.name??'Free play';$('holeLabel').textContent=current?'Hole '+hole().number:levelName(state.preferences.experience).toLowerCase();
  $('idleDisplay').hidden=!!d;$('reelDisplay').hidden=!busy||!!d?.wildcard;$('wildDisplay').hidden=!d?.wildcard;$('completeDisplay').hidden=d?.stage!=='complete';
@@ -141,6 +172,19 @@ function connection(){$('connectionStatus').textContent=navigator.onLine?'LOCAL'
 window.addEventListener('storage',event=>{if(event.key!==STORAGE_KEY)return;stopTimer();blocked=true;notice('This round changed in another tab. Reload to continue with the latest scores.');render();});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&(rolling||settling)){stopTimer();renderMachine();}});
 window.addEventListener('pagehide',stopTimer);
+$('checkUpdate').addEventListener('click',()=>checkUpdate(true));
+for(const id of ['splashUpdate','applyUpdate'])$(id).addEventListener('click',applyUpdate);
+window.addEventListener('online',()=>checkUpdate(true));
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate(true);});
 if(!history.state?.rollerUI){const requested=location.hash.slice(1);const view=views.has(requested)?requested:'start';history.replaceState({rollerUI:true,base:dialogs[view]?'play':view,depth:0},'','#'+view);}
 render();connection();syncView();
-if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').then(async registration=>{await navigator.serviceWorker.ready;$('offlineStatus').textContent='Ready for offline play';registration.addEventListener('updatefound',()=>{const worker=registration.installing;worker?.addEventListener('statechange',()=>{if(worker.state==='installed'&&navigator.serviceWorker.controller)$('offlineStatus').textContent='Update ready · close all app tabs to apply';});});}).catch(()=>{$('offlineStatus').textContent='Offline setup unavailable · keep this tab open';});else $('offlineStatus').textContent='Offline setup unavailable in this browser';
+if('serviceWorker' in navigator){
+ navigator.serviceWorker.addEventListener('controllerchange',()=>{checkUpdate();});
+ navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(registration=>{
+  updateRegistration=registration;
+  const watch=()=>{const worker=registration.installing;if(worker)worker.addEventListener('statechange',()=>{if(worker.state==='activated')checkUpdate();});};
+  registration.addEventListener('updatefound',watch);watch();
+  navigator.serviceWorker.ready.then(()=>{$('offlineStatus').textContent='Ready for offline play';checkUpdate();});
+  checkUpdate();
+ }).catch(()=>{$('offlineStatus').textContent='Offline setup unavailable · keep this tab open';checkUpdate();});
+}else{$('offlineStatus').textContent='Offline setup unavailable in this browser';checkUpdate();}
