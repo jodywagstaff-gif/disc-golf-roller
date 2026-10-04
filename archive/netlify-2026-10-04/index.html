@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<!-- This site is hosted on Netlify. Anyone can build and deploy a site
+     like this one for free: https://netlify.new/?utm_campaign=loops&utm_source=ai-legible&utm_medium=owned&utm_content=comment&utm_id=098f1e2c-c9b3-41d5-a8ee-ebb387500714
+     Netlify hosting facts for this site: static/SSR served via Netlify Edge. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Disc Golf Roller</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Press Start 2P', Arial, sans-serif;
+      background: linear-gradient(135deg, #1a0f3a 0%, #3d1a5c 50%, #1a0f3a 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      color: white;
+      overflow-x: hidden;
+      padding: 20px 0;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: repeating-linear-gradient(0deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px, transparent 1px, transparent 2px);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .container {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      max-width: 600px;
+      padding: 20px;
+      margin: 0 auto;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .header-stars {
+      font-size: 1.5rem;
+      animation: neon-glow 2s infinite;
+      margin-bottom: 10px;
+    }
+
+    .header h1 {
+      font-size: 2rem;
+      color: #ff6600;
+      text-shadow: 0 0 20px #ff6600, 0 0 40px #ff6600;
+      animation: neon-glow 2s infinite;
+      margin-bottom: 5px;
+    }
+
+    .header-subtitle {
+      color: #00ffff;
+      font-size: 0.7rem;
+      letter-spacing: 2px;
+    }
+
+    .card {
+      background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+      border: 4px solid #ff6600;
+      border-radius: 15px;
+      padding: 30px;
+      box-shadow: 0 0 30px #ff6600, 0 0 60px #ff6600, inset 0 0 20px rgba(255,102,0,0.2);
+      position: relative;
+    }
+
+    .card::before, .card::after {
+      content: '';
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      opacity: 0.7;
+    }
+
+    .card::before {
+      top: 10px;
+      left: 10px;
+      background: #ffff00;
+    }
+
+    .card::after {
+      top: 10px;
+      right: 10px;
+      background: #ff1493;
+    }
+
+    .corner-br {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #00ff00;
+      opacity: 0.7;
+    }
+
+    .corner-bl {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #00ffff;
+      opacity: 0.7;
+    }
+
+    .hidden { display: none !important; }
+
+    .emoji-large {
+      font-size: 4rem;
+      animation: bounce 1s infinite;
+      margin-bottom: 20px;
+    }
+
+    .section-title {
+      color: #ff6600;
+      text-shadow: 0 0 20px #ff6600;
+      font-size: 1.2rem;
+      margin-bottom: 20px;
+      letter-spacing: 2px;
+    }
+
+    input[type="text"],
+    input[type="range"] {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      background: #0f0f1e;
+      border: 2px solid #ff6600;
+      color: #ff6600;
+      font-family: 'Press Start 2P', Arial, sans-serif;
+      font-size: 0.7rem;
+      border-radius: 5px;
+    }
+
+    input[type="range"] {
+      padding: 0;
+      height: 8px;
+      accent-color: #ff6600;
+    }
+
+    .exp-label {
+      color: #00ffff;
+      font-size: 0.7rem;
+      margin-bottom: 5px;
+      text-align: center;
+    }
+
+    .exp-range {
+      color: #00ffff;
+      font-size: 0.6rem;
+      margin-top: 5px;
+      text-align: center;
+    }
+
+    .button {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      background: linear-gradient(180deg, #4488ff 0%, #0055dd 100%);
+      color: white;
+      border: 3px solid #0088ff;
+      border-radius: 10px;
+      font-family: 'Press Start 2P', Arial, sans-serif;
+      font-size: 0.8rem;
+      cursor: pointer;
+      text-transform: uppercase;
+      box-shadow: 0 6px 0 #0066ff, 0 10px 15px rgba(0,0,0,0.5);
+      transition: all 0.1s;
+    }
+
+    .button:hover {
+      transform: scale(1.05);
+    }
+
+    .button:active {
+      transform: scale(0.95);
+    }
+
+    .button.start {
+      background: linear-gradient(180deg, #ff4444 0%, #cc0000 100%);
+      border-color: #ff6666;
+      box-shadow: 0 6px 0 #cc0000, 0 10px 15px rgba(0,0,0,0.5);
+    }
+
+    .button.reset {
+      background: linear-gradient(180deg, #44ff44 0%, #00cc00 100%);
+      border-color: #66ff66;
+      box-shadow: 0 6px 0 #00cc00, 0 10px 15px rgba(0,0,0,0.5);
+    }
+
+    .button.tap {
+      background: linear-gradient(180deg, #ffff44 0%, #ffaa00 100%);
+      color: #000;
+      border-color: #ffff66;
+      box-shadow: 0 6px 0 #ff6600, 0 10px 15px rgba(0,0,0,0.5);
+    }
+
+    .results {
+      background: #0f0f1e;
+      border: 3px solid #00ffff;
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 15px;
+      min-height: 60px;
+    }
+
+    .result-item {
+      margin: 8px 0;
+      animation: pop-in 0.4s ease-out;
+    }
+
+    .result-disc {
+      color: #ff6600;
+      text-shadow: 0 0 10px #ff6600;
+      font-size: 0.9rem;
+    }
+
+    .result-stability {
+      color: #ffff00;
+      text-shadow: 0 0 10px #ffff00;
+      font-size: 0.9rem;
+    }
+
+    .result-shot {
+      color: #00ffff;
+      text-shadow: 0 0 10px #00ffff;
+      font-size: 0.9rem;
+    }
+
+    .roller {
+      background: #0f0f1e;
+      border: 3px solid #ff6600;
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+      min-height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 15px;
+      box-shadow: inset 0 0 20px rgba(255,102,0,0.3);
+    }
+
+    .roller-text {
+      font-size: 1.2rem;
+      animation: flicker 0.15s infinite;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 95%;
+    }
+
+    .wildcard-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 20px;
+      padding: 10px;
+    }
+
+    .wildcard-btn {
+      padding: 15px;
+      background: #ff6600;
+      color: #000;
+      border: 2px solid #ffaa00;
+      border-radius: 8px;
+      font-family: 'Press Start 2P', Arial, sans-serif;
+      font-size: 0.65rem;
+      cursor: pointer;
+      font-weight: bold;
+      box-shadow: 0 4px 0 #ff6600;
+      transition: all 0.1s;
+    }
+
+    .wildcard-btn:hover {
+      transform: scale(1.05);
+    }
+
+    .wildcard-btn:active {
+      transform: scale(0.95);
+    }
+
+    .wildcard-stability {
+      grid-template-columns: 1fr;
+    }
+
+    .wildcard-stability .wildcard-btn {
+      background: #ffff00;
+      border-color: #ffff00;
+      box-shadow: 0 4px 0 #ffff00;
+    }
+
+    .wildcard-shot {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .wildcard-shot .wildcard-btn {
+      background: #00ffff;
+      color: #000;
+      border-color: #00ffff;
+      box-shadow: 0 4px 0 #00ffff;
+    }
+
+    .progress-dots {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      margin-top: 20px;
+    }
+
+    .dot {
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      border: 2px solid;
+      transition: all 0.3s;
+    }
+
+    .dot.active {
+      box-shadow: 0 0 20px;
+    }
+
+    .dot.disc {
+      background: #ff6600;
+      border-color: #ff6600;
+    }
+
+    .dot.stability {
+      background: #ffff00;
+      border-color: #ffff00;
+    }
+
+    .dot.shot {
+      background: #00ffff;
+      border-color: #00ffff;
+    }
+
+    .difficulty-section {
+      margin-bottom: 20px;
+      padding: 15px;
+      background: rgba(0,255,255,0.05);
+      border: 2px solid #00ffff;
+      border-radius: 10px;
+    }
+
+    @keyframes neon-glow {
+      0%, 100% { text-shadow: 0 0 10px #ff6600, 0 0 20px #ff6600; }
+      50% { text-shadow: 0 0 20px #ff6600, 0 0 40px #ff6600, 0 0 60px #ff6600; }
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-20px); }
+    }
+
+    @keyframes flicker {
+      0%, 18%, 22%, 25%, 54%, 56%, 100% { opacity: 1; }
+      20%, 24%, 55% { opacity: 0.4; }
+    }
+
+    @keyframes pop-in {
+      0% { transform: scale(0) rotate(-10deg); opacity: 0; }
+      50% { transform: scale(1.1) rotate(5deg); }
+      100% { transform: scale(1) rotate(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-stars">★ ★ ★</div>
+      <h1>DISC ROLLER</h1>
+      <div class="header-subtitle">[ LEAGUE MODE ]</div>
+    </div>
+
+    <div class="card">
+      <div class="corner-br"></div>
+      <div class="corner-bl"></div>
+
+      <!-- START SCREEN -->
+      <div id="startScreen">
+        <div style="text-align: center;">
+          <div class="emoji-large">🥏</div>
+          <div style="color: #ff6600; text-shadow: 0 0 20px #ff6600; font-size: 1rem; margin-bottom: 20px;">READY TO PLAY?</div>
+          <button class="button start" onclick="startGame()">[ START ]</button>
+        </div>
+      </div>
+
+      <!-- GAME SCREEN -->
+      <div id="gameScreen" class="hidden">
+        <div id="resultsArea" class="results"></div>
+
+        <!-- DIFFICULTY SLIDER -->
+        <div id="difficultySection" class="difficulty-section">
+          <div class="exp-label">PLAYER DIFFICULTY</div>
+          <div class="exp-label"><span id="expLabel">🟡 INTERMEDIATE</span></div>
+          <input type="range" id="experienceSlider" min="0" max="100" value="50" />
+          <div class="exp-range">BEGINNER ← → EXPERT</div>
+        </div>
+
+        <!-- ROLLING PHASE -->
+        <div id="rollingPhase">
+          <div class="roller">
+            <div id="rollerText" class="roller-text">LOADING...</div>
+          </div>
+        </div>
+
+        <!-- TAP BUTTON -->
+        <button id="tapButton" class="button tap" style="margin-top: 20px; margin-bottom: 20px;" onclick="stopRoll()">[ TAP ]</button>
+
+        <!-- WILDCARD PHASE -->
+        <div id="wildcardPhase" class="hidden">
+          <div class="emoji-large">🃏</div>
+          <div id="wildcardTitle" class="section-title">PICK YOUR OPTION</div>
+          <div id="wildcardGrid" class="wildcard-grid"></div>
+        </div>
+
+        <!-- COMPLETE PHASE -->
+        <div id="completePhase" class="hidden">
+          <div class="emoji-large">🎯</div>
+          <div style="color: #ffff00; text-shadow: 0 0 10px #ffff00; font-size: 0.8rem; margin-bottom: 15px;">[ CHALLENGE LOCKED ]</div>
+          <button class="button reset" onclick="resetGame()">[ RESET ]</button>
+        </div>
+
+        <div class="progress-dots">
+          <div id="dotDisc" class="dot disc"></div>
+          <div id="dotStability" class="dot stability"></div>
+          <div id="dotShot" class="dot shot"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const state = {
+      phase: 'start', // start, disc, stability, shot, complete, wildcard
+      selectedDisc: null,
+      selectedStability: null,
+      selectedShot: null,
+      experience: 50,
+      discIdx: 0,
+      stabilityIdx: 0,
+      shotIdx: 0,
+      rollingInterval: null,
+      isRolling: false
+    };
+
+    const data = {
+      discs: ['Driver', 'Fairway Driver', 'Midrange', 'Putter', '🃏 WILDCARD'],
+      stabilities: {
+        beginner: ['Understable', 'Neutral', 'Stable', '🃏 WILDCARD'],
+        intermediate: ['Understable', 'Neutral', 'Stable', '🃏 WILDCARD'],
+        expert: ['Super Stable', 'Stable', 'Neutral', 'Understable', 'Super Understable', '🃏 WILDCARD']
+      },
+      basicShots: ['Backhand', 'Forehand', 'Overhand'],
+      advancedShots: ['Roller', 'Skip Shot', 'Hyzer', 'Anhyzer', 'Offhand']
+    };
+
+    const getStabilities = (exp) => {
+      if (exp <= 33) return data.stabilities.beginner;
+      if (exp <= 66) return data.stabilities.intermediate;
+      return data.stabilities.expert;
+    };
+
+    function getExperienceLabel(exp) {
+      if (exp <= 33) return '🟢 BEGINNER';
+      if (exp <= 66) return '🟡 INTERMEDIATE';
+      return '🔴 EXPERT';
+    }
+
+    // Create weighted shot pool based on difficulty
+    function getWeightedShots(exp) {
+      const basic = data.basicShots;
+      const advanced = data.advancedShots;
+      let pool = [];
+
+      if (exp <= 33) {
+        // BEGINNER: mostly basics, 1 advanced shot mixed in
+        pool = [...basic, ...basic, ...basic, advanced[0], '🃏 WILDCARD'];
+      } else if (exp <= 66) {
+        // INTERMEDIATE: mostly basics with Hyzer and Anhyzer mixed in
+        pool = [...basic, ...basic, 'Hyzer', 'Anhyzer', '🃏 WILDCARD'];
+      } else {
+        // EXPERT: all shots equally
+        pool = [...basic, ...advanced, '🃏 WILDCARD'];
+      }
+
+      return pool;
+    }
+
+    function updateExperienceLabel() {
+      const exp = parseInt(document.getElementById('experienceSlider').value);
+      state.experience = exp;
+      document.getElementById('expLabel').textContent = getExperienceLabel(exp);
+    }
+
+    function startGame() {
+      state.phase = 'disc';
+      state.selectedDisc = null;
+      state.selectedStability = null;
+      state.selectedShot = null;
+      state.discIdx = 0;
+      state.stabilityIdx = 0;
+      state.shotIdx = 0;
+      document.getElementById('startScreen').classList.add('hidden');
+      document.getElementById('gameScreen').classList.remove('hidden');
+      updateExperienceLabel();
+      showPhase();
+      startRolling();
+    }
+
+    function startRolling() {
+      if (state.rollingInterval) clearInterval(state.rollingInterval);
+
+      state.isRolling = true;
+      state.rollingInterval = setInterval(() => {
+        if (state.phase === 'disc') {
+          state.discIdx = (state.discIdx + 1) % data.discs.length;
+        } else if (state.phase === 'stability') {
+          const stabs = getStabilities(state.experience);
+          state.stabilityIdx = (state.stabilityIdx + 1) % stabs.length;
+        } else if (state.phase === 'shot') {
+          const shots = getWeightedShots(state.experience);
+          state.shotIdx = (state.shotIdx + 1) % shots.length;
+        }
+        updateRoller();
+      }, 60);
+    }
+
+    function updateRoller() {
+      const text = document.getElementById('rollerText');
+      if (state.phase === 'disc') {
+        text.textContent = data.discs[state.discIdx];
+        text.style.color = '#ff6600';
+        text.style.textShadow = '0 0 10px #ff6600';
+      } else if (state.phase === 'stability') {
+        const stabs = getStabilities(state.experience);
+        text.textContent = stabs[state.stabilityIdx];
+        text.style.color = '#ffff00';
+        text.style.textShadow = '0 0 10px #ffff00';
+      } else if (state.phase === 'shot') {
+        const shots = getWeightedShots(state.experience);
+        text.textContent = shots[state.shotIdx];
+        text.style.color = '#00ffff';
+        text.style.textShadow = '0 0 10px #00ffff';
+      }
+    }
+
+    function stopRoll() {
+      if (!state.isRolling) return;
+
+      state.isRolling = false;
+      clearInterval(state.rollingInterval);
+
+      if (state.phase === 'disc') {
+        const selected = data.discs[state.discIdx];
+        state.selectedDisc = selected;
+
+        if (selected.includes('WILDCARD')) {
+          state.phase = 'wildcard-disc';
+        } else {
+          state.phase = 'stability';
+          startRolling();
+        }
+      } else if (state.phase === 'stability') {
+        const stabs = getStabilities(state.experience);
+        const selected = stabs[state.stabilityIdx];
+        state.selectedStability = selected;
+
+        if (selected.includes('WILDCARD')) {
+          state.phase = 'wildcard-stability';
+        } else {
+          state.phase = 'shot';
+          startRolling();
+        }
+      } else if (state.phase === 'shot') {
+        const shots = getWeightedShots(state.experience);
+        const selected = shots[state.shotIdx];
+        state.selectedShot = selected;
+
+        if (selected.includes('WILDCARD')) {
+          state.phase = 'wildcard-shot';
+        } else {
+          state.phase = 'complete';
+        }
+      }
+
+      showPhase();
+    }
+
+    function showPhase() {
+      document.getElementById('rollingPhase').classList.add('hidden');
+      document.getElementById('wildcardPhase').classList.add('hidden');
+      document.getElementById('completePhase').classList.add('hidden');
+      document.getElementById('difficultySection').classList.add('hidden');
+      document.getElementById('tapButton').classList.add('hidden');
+
+      if (state.phase === 'disc' || state.phase === 'stability' || state.phase === 'shot') {
+        document.getElementById('rollingPhase').classList.remove('hidden');
+        document.getElementById('difficultySection').classList.remove('hidden');
+        document.getElementById('tapButton').classList.remove('hidden');
+        updateRoller();
+      } else if (state.phase.includes('wildcard')) {
+        document.getElementById('wildcardPhase').classList.remove('hidden');
+        document.getElementById('difficultySection').classList.remove('hidden');
+        renderWildcard();
+      } else if (state.phase === 'complete') {
+        document.getElementById('completePhase').classList.remove('hidden');
+      }
+
+      updateProgress();
+      updateResults();
+    }
+
+    function updateResults() {
+      const results = document.getElementById('resultsArea');
+      let html = '';
+
+      if (state.selectedDisc) {
+        html += `<div class="result-item result-disc">${state.selectedDisc}</div>`;
+      }
+      if (state.selectedStability) {
+        html += `<div class="result-item result-stability">${state.selectedStability}</div>`;
+      }
+      if (state.selectedShot) {
+        html += `<div class="result-item result-shot">${state.selectedShot}</div>`;
+      }
+
+      results.innerHTML = html;
+    }
+
+    function updateProgress() {
+      const disc = document.getElementById('dotDisc');
+      const stab = document.getElementById('dotStability');
+      const shot = document.getElementById('dotShot');
+
+      disc.classList.toggle('active', state.selectedDisc !== null);
+      stab.classList.toggle('active', state.selectedStability !== null);
+      shot.classList.toggle('active', state.selectedShot !== null);
+    }
+
+    function renderWildcard() {
+      const grid = document.getElementById('wildcardGrid');
+      const title = document.getElementById('wildcardTitle');
+      let options = [];
+      let className = 'wildcard-grid';
+
+      if (state.phase === 'wildcard-disc') {
+        options = ['Driver', 'Fairway Driver', 'Midrange', 'Putter'];
+        title.textContent = '[ PICK YOUR DISC ]';
+        className = 'wildcard-grid';
+      } else if (state.phase === 'wildcard-stability') {
+        options = ['Super Stable', 'Stable', 'Neutral', 'Understable', 'Super Understable'];
+        title.textContent = '[ PICK STABILITY ]';
+        className = 'wildcard-grid wildcard-stability';
+      } else if (state.phase === 'wildcard-shot') {
+        // For wildcard shot, show non-wildcard options from weighted pool
+        const basic = data.basicShots;
+        const advanced = data.advancedShots;
+        options = [...basic, ...advanced];
+        title.textContent = '[ PICK SHOT TYPE ]';
+        className = 'wildcard-grid wildcard-shot';
+      }
+
+      grid.className = className;
+      grid.innerHTML = options.map(opt => `
+        <button class="wildcard-btn" onclick="selectWildcard('${opt}')">${opt}</button>
+      `).join('');
+    }
+
+    function selectWildcard(value) {
+      if (state.phase === 'wildcard-disc') {
+        state.selectedDisc = value;
+        state.phase = 'stability';
+        startRolling();
+      } else if (state.phase === 'wildcard-stability') {
+        state.selectedStability = value;
+        state.phase = 'shot';
+        startRolling();
+      } else if (state.phase === 'wildcard-shot') {
+        state.selectedShot = value;
+        state.phase = 'complete';
+      }
+      showPhase();
+    }
+
+    function resetGame() {
+      state.phase = 'start';
+      state.selectedDisc = null;
+      state.selectedStability = null;
+      state.selectedShot = null;
+      state.discIdx = 0;
+      state.stabilityIdx = 0;
+      state.shotIdx = 0;
+      state.experience = 50;
+      if (state.rollingInterval) clearInterval(state.rollingInterval);
+      document.getElementById('experienceSlider').value = 50;
+      updateExperienceLabel();
+      document.getElementById('startScreen').classList.remove('hidden');
+      document.getElementById('gameScreen').classList.add('hidden');
+      document.getElementById('resultsArea').innerHTML = '';
+    }
+
+    // Init
+    document.getElementById('experienceSlider').addEventListener('input', updateExperienceLabel);
+  </script>
+</body>
+</html>

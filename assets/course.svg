@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 400" shape-rendering="crispEdges">
+<defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#242743"/><stop offset="1" stop-color="#56506a"/></linearGradient></defs>
+<path fill="url(#sky)" d="M0 0h720v400H0z"/><path fill="#ffb677" d="M444 52h80v12h24v16h16v72h-16v16h-24v12h-80v-12h-24v-16h-16V80h16V64h24z"/><path fill="#d17d76" d="M404 120h160v12H404zm0 30h160v8H404z"/><path fill="#70738b" d="M0 204h40v-20h36v-22h30v-22h40v24h22v24h26v20h66v-22h22v-24h22v-24h36v-26h28v26h24v30h20v26h36v28h72v-30h32v-20h44v-26h24v26h20v22h22v18h46v-20h30v-20h20v200H0z"/>
+<path fill="#383f57" d="M0 244h72v-24h44v-30h26v30h36v22h54v20h32v-30h34v-30h28v-20h24v24h24v28h56v-12h24v-28h24v-20h24v24h28v20h32v22h32v-22h26v-24h24v-20h20v20h24v30h56v152H0z"/>
+<path fill="#203e43" d="M0 278h140v-12h164v14h176v-18h240v138H0z"/><path fill="#2e5a49" d="M0 318h148v-18h172v12h128v-14h272v102H0z"/><path fill="#47734c" d="M0 362h182v-18h158v-12h126v12h254v56H0z"/><path fill="#6c8852" d="M230 400v-18h30v-20h38v-12h36v-16h54v-16h46v-10h42v10h-22v16h-44v14h-48v14h-34v20h-30v18z"/>
+<g fill="#152d36"><path d="M34 270V132h12v-24h12V80h12v28h12v24h12v30h12v24H88v18h30v26H82v40z"/><path d="M102 280V178h12v-24h12v-30h12v30h12v24h12v30h12v24h-28v18h32v22h-38v8z"/><path d="M650 274V112h12V84h12V60h12v24h12v28h12v30h10v30h-18v24h18v26h-18v52z"/></g>
+<g fill="#23463e"><path d="M0 350v-86h14v-28h12v-30h12v30h12v24h12v26h16v24H52v40z"/><path d="M574 336V214h12v-28h12v-30h12v30h12v28h12v24h14v26h-28v20h36v24h-36v28z"/></g>
+<g><path fill="#131f2b" d="M474 274h60v8h-60zM500 208h8v98h-8z"/><path fill="#e3dcaa" d="M476 204h56v8h-56zm4 8h4v36h-4zm12 0h4v42h-4zm20 0h4v42h-4zm12 0h4v36h-4z"/><path fill="#d3ed84" d="M470 194h68v12h-68zM468 254h72v8h-72zM476 262h56v8h-56z"/><path fill="#b4cb71" d="M476 248h8v8h-8zm48 0h8v8h-8z"/></g>
+<path fill="#c3fc6b" d="M260 162h48v6h12v8h-60v-6h-8v-8z"/><path fill="#c3fc6b" opacity=".3" d="M224 170h22v4h-22zm-28 0h18v4h-18z"/>
+<g fill="#d6eab0"><path d="M184 302h4v8h8v4h-8v8h-4v-8h-8v-4h8zM538 344h4v8h8v4h-8v8h-4v-8h-8v-4h8z"/><path d="M72 44h4v4h-4zm144 22h4v4h-4zm366-32h4v4h-4zm-216 12h4v4h-4z"/></g>
+</svg>

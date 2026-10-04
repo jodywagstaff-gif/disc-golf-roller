@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="description" content="A pocket arcade for disc golf league night. Stop the reels, lock your challenge, and take it to the course.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Disc Roller · League Arcade</title>
+  <link rel="icon" href="./assets/icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to game</a>
+  <div class="shell">
+    <header class="masthead">
+      <a class="brand" href="./" aria-label="Disc Roller home"><span class="brand-icon" aria-hidden="true">◈</span><span>DISC<span class="brand-accent">ROLLER</span><small>THE LEAGUE NIGHT ARCADE</small></span></a>
+      <div class="connection"><span id="connectionDot" class="status-dot"></span><span id="connectionStatus">LOCAL PLAY</span></div>
+    </header>
+
+    <main id="main">
+      <section class="hero" aria-labelledby="heroTitle">
+        <div class="hero-copy"><p class="eyebrow"><span class="tiny-square"></span> LESS ROUTINE. MORE GAME.</p><h1 id="heroTitle">Your next shot.<br><span>A whole new game.</span></h1><p class="hero-description">Catch the reel. Lock your challenge. <br>Bring a little arcade to the course.</p><span class="hero-tag">8-BIT SPIRIT. REAL-WORLD ROUNDS.</span></div>
+        <div class="landscape" aria-hidden="true"><img src="./assets/course.svg" alt="" width="720" height="400"><span class="scene-label">INSERT DISC →</span></div>
+      </section>
+
+      <nav class="quick-nav" aria-label="League night sections"><a href="#machineTitle">Play ↗</a><a href="#playersTitle">Players</a><a href="#scoreTitle">Scorecard</a></nav>
+      <div id="notice" class="notice" role="status" hidden></div>
+      <div class="layout">
+        <section class="machine panel" aria-labelledby="machineTitle">
+          <div class="panel-heading"><div><p class="eyebrow muted">THE CHALLENGE MACHINE</p><h2 id="machineTitle">Make your own luck.</h2></div><span class="coin" aria-hidden="true">✦</span></div>
+          <div class="machine-topline"><span id="turnLabel">READY, PLAYER ONE?</span><span id="roundLabel">FREE PLAY</span></div>
+          <div class="hole-picker"><label for="activeHole">PLAYING</label><select id="activeHole" aria-label="Current hole"></select><span id="currentPlayerLabel">Free play</span></div>
+          <div id="gameDisplay" class="game-display">
+            <div class="display-grid" aria-hidden="true"></div>
+            <div id="idleDisplay" class="idle-display"><div class="pixel-disc" aria-hidden="true"><span></span></div><p class="pixel-title">LET IT FLY</p><p>Three reels. One challenge.<br>Your timing makes the call.</p></div>
+            <div id="reelDisplay" class="reel-display" hidden><p id="reelStage" class="display-kicker">01 / DISC TYPE</p><div class="reel-brackets"><span aria-hidden="true">›</span><strong id="reelText">Driver</strong><span aria-hidden="true">‹</span></div><p class="display-hint">Watch the reel. Tap to stop.</p></div>
+            <div id="wildDisplay" class="wild-display" hidden><p class="display-kicker">✦ WILD CARD ✦</p><h3 id="wildTitle">Your choice.</h3><div id="wildOptions" class="wild-options"></div></div>
+            <div id="completeDisplay" class="complete-display" hidden><span class="locked-badge">✓ CHALLENGE LOCKED</span><h3>Take it to<br>the course.</h3><p id="completePlayer"></p></div>
+          </div>
+          <div class="reel-slots" aria-label="Your challenge"><div class="reel-slot" id="slot-disc"><span>01 / DISC</span><strong id="result-disc">—</strong></div><div class="reel-slot" id="slot-stability"><span>02 / STABILITY</span><strong id="result-stability">—</strong></div><div class="reel-slot" id="slot-shot"><span>03 / SHOT</span><strong id="result-shot">—</strong></div></div>
+          <div class="difficulty-row"><label for="difficulty">PLAYER LEVEL <span id="difficultyName">INTERMEDIATE</span></label><input type="range" id="difficulty" min="0" max="100" value="50" aria-describedby="difficultyHelp"><p id="difficultyHelp">Beginner <span>Expert</span></p></div>
+          <button id="mainAction" class="arcade-button"><span id="actionLabel">START ROLLING</span><span id="actionIcon" aria-hidden="true">↗</span></button>
+          <p class="control-hint" id="controlHint">Tap to play · Space or Enter on the focused button</p>
+          <div id="announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+        </section>
+
+        <aside class="side-stack">
+          <section class="panel players-panel" aria-labelledby="playersTitle"><div class="panel-heading"><div><p class="eyebrow muted">BETTER WITH YOUR CREW</p><h2 id="playersTitle">Player select<span class="title-dot">.</span></h2></div><span id="playerCount" class="count-badge">00</span></div><p class="section-description">Add your crew, then pick who’s up.</p><form id="playerForm" class="player-form"><label for="playerName" class="sr-only">Player name</label><input id="playerName" name="playerName" type="text" maxlength="32" placeholder="Enter a player name" autocomplete="off" required><button type="submit" aria-label="Add player">+</button></form><p id="playerError" class="field-error" role="alert" hidden></p><div id="playerList" class="player-list"></div><div id="emptyPlayers" class="empty-players"><span aria-hidden="true">＋</span><p>Your crew goes here.<br>Or jump straight into free play.</p></div><div class="local-note"><span aria-hidden="true">▣</span><p>Saved on this device.<br><span>Your league night stays with you.</span></p></div></section>
+          <section class="howto panel"><p class="eyebrow muted">HOW TO PLAY</p><ol><li><span>01</span><p><strong>Pick your level</strong><small>Find your kind of challenge.</small></p></li><li><span>02</span><p><strong>Catch all three reels</strong><small>Disc. Stability. Shot. Tap to stop.</small></p></li><li><span>03</span><p><strong>Send it</strong><small>Play the challenge you locked in.</small></p></li></ol></section>
+        </aside>
+      </div>
+
+      <section class="panel score-panel" aria-labelledby="scoreTitle"><div class="panel-heading"><div><p class="eyebrow muted">EVERY THROW COUNTS</p><h2 id="scoreTitle">The scorecard<span class="title-dot">.</span></h2></div><span class="mode-badge">STROKE PLAY</span></div><div class="score-intro"><p id="scoreDescription">9 holes · Total strokes · Lower is better</p><button id="newNightButton" class="text-button subtle">New round ↗</button></div><p id="scoreEmpty" class="score-empty">Add players to start keeping score.</p><div id="scoreTableWrap" class="score-table-wrap" role="region" aria-label="Stroke scorecard, scroll horizontally for more holes" tabindex="0"><table id="scoreTable"></table></div><p class="score-help">Enter strokes after each hole. Leave unplayed holes blank. Tap any score to correct it.</p></section>
+      <section class="panel history-panel" aria-labelledby="historyTitle"><div class="panel-heading"><div><p class="eyebrow muted">THE ROUND SO FAR</p><h2 id="historyTitle">Challenge log<span class="title-dot">.</span></h2></div><button id="exportButton" class="text-button">Export backup <span aria-hidden="true">↗</span></button></div><div id="historyEmpty" class="history-empty"><span aria-hidden="true">▤</span><p>No challenges yet. Your first one is a tap away.</p></div><ol id="historyList" class="history-list"></ol><div class="session-footer"><span id="saveStatus">Progress saves automatically on this device.</span></div></section>
+    </main>
+    <footer class="footer"><span>DISC ROLLER <span class="footer-cross">✦</span> GO PLAY OUTSIDE.</span><span id="offlineStatus">Preparing offline play…</span></footer>
+  </div>
+  <dialog id="newNightDialog"><h2>A fresh round?</h2><p>Your players stay. Previous scores and challenges stay saved and are included in your backup.</p><label for="newRoundHoles">Round length</label><select id="newRoundHoles"><option value="9">9 holes</option><option value="18">18 holes</option></select><div class="dialog-actions"><button id="cancelNight" class="secondary-button">Keep playing</button><button id="confirmNight" class="secondary-button primary-small">Start new round</button></div></dialog>
+</body>
+</html>

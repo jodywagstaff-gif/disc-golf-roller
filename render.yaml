@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: disc-golf-roller-preview
+    runtime: static
+    repo: https://github.com/jodywagstaff-gif/disc-golf-roller
+    branch: main
+    buildCommand: node --test tests/model.test.mjs && node build.mjs
+    staticPublishPath: ./dist
+    autoDeployTrigger: checksPass
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: no-referrer
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+      - path: /sw.js
+        name: Cache-Control
+        value: no-cache
