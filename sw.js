@@ -1,4 +1,4 @@
-const CACHE='disc-roller-shell-v2-1';
+const CACHE='disc-roller-shell-v3-1';
 const SHELL=['./','./index.html','./style.css','./app.js','./model.js','./manifest.webmanifest','./assets/icon.svg','./assets/course.svg','./assets/press-start-2p.woff2'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL))));
 // Do not force an update into an ongoing round. New versions activate after all

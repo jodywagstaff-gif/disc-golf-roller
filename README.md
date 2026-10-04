@@ -1,6 +1,6 @@
 # Disc Roller — League Arcade
 
-A mobile-first disc golf arcade with timing-based reels, player names, per-hole stroke scores, and offline play. The original deployed prototype is preserved separately in `archive/netlify-2026-10-04/`; this is a new implementation based on that recovered public client, not a recovered original source repository.
+A mobile-first disc golf arcade with timing-based reels, optional player names and stroke scores, and offline play. Start opens a viewport-filling roller with large controls. No configuration, roster or tutorial is required. Scores, Setup and Help open on demand in separate modal panels. The original deployed prototype is preserved separately in `archive/netlify-2026-10-04/`; this is a new implementation based on that recovered public client, not a recovered original source repository.
 
 ## Run, test, build
 
@@ -19,7 +19,9 @@ Optional browser tests use Playwright. Install it in your development environmen
 
 ## Play and scoring
 
-- Add players or use the roller in free play. Choose the current hole and player.
+- Free play is the default. Start, then Roll. No player names or score settings are required.
+- Optional Setup lets you add/select players, choose a hole, adjust difficulty and switch/start rounds. Scores shows one hole at a time with large number fields and plus/minus controls. Help is on demand.
+- Opening a menu or returning to the splash pauses the reel. Close, Escape and browser Back preserve the challenge; Resume restarts it. Refresh retains the screen and saved progress. Switching players or rounds is disabled during an unfinished challenge.
 - The reels cycle every 60 ms; stopping is deliberately a timing mechanic, not a random draw. Original pools and wildcard choices are retained.
 - Difficulty changes normalize the current index before play resumes. Backgrounding pauses the reel; refreshing restores the selected stages and offers Resume.
 - Scorecards count normal strokes per hole. Blank means unplayed; zero is rejected. Corrections replace a score; clearing it restores blank. Totals show holes recorded and are explicitly partial until complete.
@@ -32,7 +34,7 @@ Optional browser tests use Playwright. Install it in your development environmen
 
 Names, scores, settings, completed challenges and partial challenges are stored **only in this browser's localStorage** under `disc-roller.league.v1`. There are no accounts, analytics, third-party network assets or remote player-data requests. Hosting still receives normal page-request metadata. Backups downloaded by the user contain player names and scores; keep them private.
 
-Export a JSON backup from the challenge log. Browser data is not a permanent server backup: clearing browser/site data, changing origins/devices or browser eviction can remove it. Import/recovery UI is not implemented yet. Existing corrupted/unsupported data is not overwritten; export and troubleshoot before continuing. Storage errors are visible and failed changes do not get reported as saved.
+Export a JSON backup from the Scores panel. Browser data is not a permanent server backup: clearing browser/site data, changing origins/devices or browser eviction can remove it. Import/recovery UI is not implemented yet. Existing corrupted/unsupported data is not overwritten; export and troubleshoot before continuing. Storage errors are visible and failed changes do not get reported as saved.
 
 Revision checks plus Web Locks (where available) guard against competing tabs. Changes in another tab stop editing until reload. Without Web Locks the fallback revision check is not a complete simultaneous-write guarantee; use one tab. Multi-phone synchronization is **not implemented**.
 
