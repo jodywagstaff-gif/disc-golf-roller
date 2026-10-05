@@ -112,3 +112,6 @@ button,.compact-wheel{-webkit-tap-highlight-color:transparent}.compact-wheel,.wh
 .score-stepper button{width:44px;height:44px;min-height:44px;padding:0;border-radius:50%;font:800 30px/1 system-ui;background:var(--button);color:var(--button-text);touch-action:manipulation}
 .stroke-value{display:block;text-align:center;font:850 32px/44px system-ui;font-variant-numeric:tabular-nums;user-select:none;-webkit-user-select:none;color:var(--text)}
 .round-totals b{font-size:24px;white-space:nowrap}
+.quick-hole-bar{grid-template-columns:1fr 90px}.score-actions #nextScoreHole{background:var(--button);color:var(--button-text);border-color:var(--button)}.score-actions #previousScoreHole{font-size:15px}
+.sheet .close-button{display:inline-flex;justify-content:center;align-items:center;flex-shrink:0;min-width:82px;min-height:44px;padding:8px 12px;background:var(--button);color:var(--button-text);border:2px solid var(--button);border-radius:10px;font:800 16px/1.2 system-ui}.sheet .close-button:focus-visible{outline:3px solid var(--text);outline-offset:2px}
+.score-actions button{white-space:nowrap}.score-actions #previousScoreHole{font-size:14px;padding:6px 4px}

@@ -1,4 +1,4 @@
-const CACHE='disc-roller-shell-v8-1';
+const CACHE='disc-roller-shell-v9-1';
 const SHELL=['./index.html','./style.css','./app.js','./model.js','./reel-motion.js','./release.js','./theme.js','./score-ui.js','./manifest.webmanifest','./assets/icon.svg','./assets/course.svg','./assets/press-start-2p.woff2'];
 // Activate the completed shell for the NEXT navigation, even when old tabs are
 // open. Never navigate/reload clients: existing JavaScript and scores stay put.

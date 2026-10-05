@@ -120,6 +120,7 @@ export function applyCommand(input,type,payload={}){
   break;
  }
  case 'score.set':case 'score.hole.set':{
+   if(payload.roundId&&payload.roundId!==round.id)throw new Error('Round changed before this score was saved.');
   const entries=type==='score.set'?[payload]:payload.scores?.map(s=>({...s,holeId:payload.holeId}));
   if(!Array.isArray(entries)||new Set(entries.map(s=>s.playerId)).size!==entries.length)throw new Error('Invalid score entries.');
   for(const entry of entries){
@@ -127,9 +128,11 @@ export function applyCommand(input,type,payload={}){
    const {strokes}=entry;if(strokes!==null&&(!Number.isInteger(strokes)||strokes<1||strokes>99))throw new Error('Enter whole strokes from 1 to 99, or leave the hole blank.');
    const existing=round.scores.find(s=>s.playerId===entry.playerId&&s.holeId===entry.holeId);
    if(strokes===null)round.scores=round.scores.filter(s=>s!==existing);else if(existing){existing.strokes=strokes;existing.updatedAt=time;}else round.scores.push({id:newId(),playerId:entry.playerId,holeId:entry.holeId,strokes,updatedAt:time});
-  }break;
- }
- case 'round.start':{
+   }
+   if(!state.draft&&!round.teeOrders[state.activeHoleId]){const honors=teeOrder(round,state.activeHoleId);if(honors.ready)state.activePlayerId=honors.order[0]??null;}
+   break;
+  }
+  case 'round.start':{
   if(state.draft&&state.draft.stage!=='complete')throw new Error('Finish this challenge before starting a new round.');const next=makeRound(state.players,payload.holeCount);state.rounds.push(next);state.activeRoundId=next.id;state.activeHoleId=next.holes[0].id;state.activePlayerId=state.players[0]?.id??null;state.draft=null;break;
  }
  case 'round.select':{

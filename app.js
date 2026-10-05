@@ -71,7 +71,7 @@ function commit(type,payload={}){
   if(blocked)throw new Error('Export your saved data from Scores and reload before making changes.');
   const write=()=>{let next;try{next=applyCommand(state,type,payload);}catch(error){error.commandValidation=true;throw error;}repo.save(next,state.revision);state=next;return next;};
   try{const next=navigator.locks?await navigator.locks.request('disc-roller-write',write):write();$('saveStatus').textContent='Saved on this device · '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});return next;}
-  catch(error){stopTimer();notice(error.commandValidation||error.message.includes('another tab')?error.message:'Could not save this change. Previous saved data is intact. Export a backup, check storage, then reload.');$('saveStatus').textContent='Change not saved';throw error;}
+  catch(error){stopTimer();if(!error.commandValidation)blocked=true;notice(error.commandValidation||error.message.includes('another tab')?error.message:'Could not save this change. Previous saved data is intact. Export a backup, check storage, then reload.');$('saveStatus').textContent='Change not saved';throw error;}
  });return saveQueue;
 }
 function stopTimer(){cancelAnimationFrame(timer);clearTimeout(settleTimer);timer=null;settleTimer=null;rolling=false;settling=false;motionGeneration++;}
@@ -127,7 +127,7 @@ function syncView(){
  const dialog=dialogs[currentView]?$(dialogs[currentView]):null;
  if(dialog&&!dialog.open){dialog.showModal();dialog.scrollTop=0;dialog.querySelector('.close-button').focus({preventScroll:true});}
  if(!dialog&&previous!==currentView){const target=dialogs[previous]&&focusReturns.get(previous)?$(focusReturns.get(previous)):currentView==='play'?$('mainAction'):$('startButton');(target&&target.getClientRects().length&&!target.disabled?target:currentView==='play'?$('mainAction'):$('startButton')).focus({preventScroll:true});}
- if(currentView==='scores'&&previous!==currentView){scoreHoleId=history.state?.scoreHoleId||scoreHoleId;scoreUI.enter({preserve:previous==='par'});}if(previous==='scores'&&currentView!=='scores')scoreUI.leave();notice(lastMessage);window.scrollTo(0,0);
+ if(currentView==='scores'&&previous!==currentView){scoreHoleId=history.state?.scoreHoleId||scoreHoleId;scoreUI.enter({preserve:previous==='par'});}if(previous==='scores'&&currentView!=='scores')scoreUI.leave();if(dialog&&previous!==currentView){const target=$(focusReturns.get(previous));if(target&&dialog.contains(target)&&!target.disabled)target.focus({preventScroll:true});}notice(lastMessage);window.scrollTo(0,0);
 }
 function navigate(view,{replace=false}={}){
  if(currentView===view)return;
@@ -138,7 +138,15 @@ function navigate(view,{replace=false}={}){
 }
 function back(){if(navigatingBack)return;navigatingBack=true;if(history.state?.rollerUI&&history.state.depth>0)history.back();else navigate(baseView,{replace:true});}
 window.addEventListener('popstate',syncView);window.addEventListener('hashchange',()=>{if(location.hash.slice(1)!==currentView)syncView();});
-for(const dialog of document.querySelectorAll('dialog')){dialog.addEventListener('cancel',event=>{event.preventDefault();back();});for(const close of dialog.querySelectorAll('[data-close]'))close.addEventListener('click',back);}
+for(const dialog of document.querySelectorAll('dialog')){
+ let downOutside=false,upOutside=false,pointerId=null;
+ const outside=event=>{const r=dialog.getBoundingClientRect();return event.target===dialog&&(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom);};
+ dialog.addEventListener('pointerdown',event=>{pointerId=event.pointerId;downOutside=outside(event);upOutside=false;});
+ dialog.addEventListener('pointerup',event=>{upOutside=event.pointerId===pointerId&&downOutside&&outside(event);});
+ dialog.addEventListener('pointercancel',()=>{downOutside=false;upOutside=false;pointerId=null;});
+ dialog.addEventListener('click',event=>{const dismiss=downOutside&&upOutside&&outside(event);downOutside=false;upOutside=false;pointerId=null;if(dismiss){event.preventDefault();event.stopPropagation();back();}});
+ dialog.addEventListener('cancel',event=>{event.preventDefault();back();});for(const close of dialog.querySelectorAll('[data-close]'))close.addEventListener('click',back);
+}
 $('startButton').addEventListener('click',()=>navigate('play'));
 $('homeButton').addEventListener('click',()=>navigate('start'));
 $('splashHelp').addEventListener('click',()=>navigate('help'));
@@ -171,7 +179,7 @@ function renderPlayers(){
  $('playerList').replaceChildren(...players.map((p,i)=>{const button=document.createElement('button');button.style.setProperty('--player-color',PLAYER_COLORS[p.colorIndex]);button.className='player-row'+(p.id===state.activePlayerId?' selected':'');button.type='button';button.setAttribute('aria-pressed',String(p.id===state.activePlayerId));button.disabled=!!inProgress()||blocked||busyAction;const avatar=document.createElement('span');avatar.className='avatar';avatar.textContent=String(p.colorIndex+1).padStart(2,'0');avatar.setAttribute('aria-hidden','true');const info=document.createElement('span');info.className='player-info';const name=document.createElement('span');name.className='player-name';name.textContent=p.name;const meta=document.createElement('span');meta.className='player-meta';const summary=strokeSummary(round,p.id);meta.textContent=summary.played?`${summary.total} strokes · ${summary.played}/${summary.holes} holes`:'Ready to play';info.append(name,meta);button.append(avatar,info);if(p.id===state.activePlayerId){const turn=document.createElement('span');turn.className='player-turn';turn.textContent='UP';button.append(turn);}button.addEventListener('click',async()=>{try{await commit('player.select',{playerId:p.id});render();back();}catch{}});return button;}));
  $('playerName').disabled=!!inProgress()||blocked||busyAction;$('playerForm').querySelector('button').disabled=!!inProgress()||blocked||busyAction;
 }
-const scoreUI=createScoreUI({getState:()=>state,getHole:()=>scoreHoleId,setHole:id=>{scoreHoleId=id;if(currentView==='scores'||currentView==='par')history.replaceState({...history.state,scoreHoleId:id},'');},commit,navigate,back,notice,announce,isBlocked:()=>blocked,advance:async()=>{if(busyAction)return;busyAction=true;try{await commit('hole.advance');scoreHoleId=state.activeHoleId;notice('');render();navigate('play');announce((activePlayer()?.name??'Free play')+' is up on hole '+hole().number);}catch{}finally{busyAction=false;render();}}});
+const scoreUI=createScoreUI({getState:()=>state,getHole:()=>scoreHoleId,setHole:id=>{scoreHoleId=id;if(currentView==='scores'||currentView==='par')history.replaceState({...history.state,scoreHoleId:id},'');},commit,navigate,back,notice,announce,isBlocked:()=>blocked,refresh:()=>renderMachine(),selectHole:async holeId=>{if(inProgress()||blocked)return;const honors=teeOrder(activeRound(state),holeId);if(!honors.ready)return;await commit('hole.select',{holeId});render();}});
 function renderScores(){scoreUI.render();}
 function renderHistory(){const round=activeRound(state);const entries=round.challenges.slice().reverse();$('historyEmpty').hidden=!!entries.length;$('historyList').replaceChildren(...entries.slice(0,30).map(entry=>{const li=document.createElement('li');li.className='history-item';const who=document.createElement('span');who.className='history-person';who.textContent=state.players.find(p=>p.id===entry.playerId)?.name??'Free play';const detail=document.createElement('small');detail.textContent='Hole '+round.holes.find(h=>h.id===entry.holeId).number+' · '+levelName(entry.experience).toLowerCase();who.append(detail);const chips=document.createElement('span');chips.className='history-challenge';for(const value of [entry.disc,entry.stability,entry.shot]){const chip=document.createElement('span');chip.className='challenge-chip';chip.textContent=value;chips.append(chip);}li.append(who,chips);return li;}));}
 function render(){renderMachine();renderPlayers();renderScores();renderHistory();$('roundPicker').replaceChildren(...state.rounds.map((r,i)=>option(r.id,'Round '+(i+1)+' · '+r.holes.length+' holes')));$('roundPicker').value=state.activeRoundId;$('roundPicker').disabled=!!inProgress()||blocked||busyAction;}

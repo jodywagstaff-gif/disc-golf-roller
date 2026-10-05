@@ -17,6 +17,8 @@ The local server binds only to 127.0.0.1:4173 (PORT may override it). The static
 Optional browser tests need Playwright and a Chromium installation. PLAYWRIGHT_MODULE and CHROME_PATH can point to existing installations; TEST_URL selects the local server or authorized preview. Tests use isolated storage and fictional players.
 
 - node tests/course-browser.mjs — manual section starts, four-player handoff, honors, four visible score rows, eight-player touch scrolling, par, ace cue, score symbols, offline scores.
+- node tests/dialog-browser.mjs - prominent Back, backdrop tap/drag guards, nested navigation, keyboard/Escape, focus restoration and retained setup choices.
+- node tests/autosave-browser.mjs - queued rapid taps, immediate persistence, navigation/close/reload, bounds, offline, ace feedback, storage errors and stale tabs.
 - node tests/course-safety-browser.mjs — exact Quick Stop boundaries, saved resume, reduced motion, layouts, contrast, migration, stale tabs and corrupt data.
 - node tests/update-browser.mjs — an isolated server reproduces older cached versions and verifies multi-tab updates without forced reloads or lost data. It reads exact public GitHub fixtures when not already cached under review/.
 - Earlier browser/slot/revision/scorecard test entry points forward to the current suites.
@@ -31,11 +33,11 @@ After all three choices, a named **Pass to…** button switches to the first rem
 
 ## Quick scoring and full card
 
-Scores opens a compact hole-entry panel. At least four player rows fit at 320×480 portrait; larger rosters scroll inside the player list while Save and navigation remain visible. Use the large minus and plus buttons around one score; a vertical swipe scrolls longer player lists. Unplayed is shown as —; decreasing 1 returns to unplayed. Scores are bounded at 99. These buttons never open a numeric keyboard; keyboard users can Tab to a button and press Enter or Space. Player-name entry in Setup intentionally remains a text field.
+Scores opens a compact hole-entry panel. At least four player rows fit at 320×480 portrait; larger rosters scroll inside the player list while Previous hole and Next hole remain visible. Use the large minus and plus buttons around one score; a vertical swipe scrolls longer player lists. Unplayed is shown as —; decreasing 1 returns to unplayed. Scores are bounded at 99. These buttons never open a numeric keyboard; keyboard users can Tab to a button and press Enter or Space. Player-name entry in Setup intentionally remains a text field.
 
-**— means unplayed**, not zero or par. Scores range from 1 to 99. Scrolling only changes pending choices; **Save scores** writes the whole hole atomically. Back discards unsaved choices. Save before opening the Full card or another scoring hole. Opening the par editor preserves pending choices.
+**— means unplayed**, not zero or par. Each minus/plus tap saves immediately to this device; persistence is not debounced. Rapid taps are queued in order. Previous hole and Next hole wait for queued writes, then show the requested hole without filling blank scores. Back closes the panel and keeps edits. The prominent Back button, Escape, and a tap outside a popup all return one level. Inside-to-outside drags do not dismiss it; underlying game buttons are not activated. Unsubmitted setup choices remain available when reopened. Return to a hole to correct a score. Storage errors restore the last saved value, show an error, and block further edits until reload.
 
-**Full card** is a separate view with all players, hole scores, par and running totals. Totals show shots followed by relative par in parentheses, for example 28 (-2), 30 (E), or 32 (+2). Only scored holes contribute to relative par; editable pars are reflected immediately. Quick-entry totals include pending edits, which Back discards until Save. Totals remain marked partial until every hole is entered. Tap a hole or score to edit it. Birdies use blue circles; better-than-birdie scores use a double circle; par is a plain number; bogeys use red squares; double bogey or worse uses a darker red square with a double border. Labels and shapes supplement color. A confirmed transition to a score of 1 triggers a brief ACE cue; rendering, reopening or saving the same ace does not replay it. Reduced motion suppresses its animation.
+**Full card** is a separate view with all players, hole scores, par and running totals. Totals show shots followed by relative par in parentheses, for example 28 (-2), 30 (E), or 32 (+2). Only scored holes contribute to relative par; editable pars are reflected immediately. Quick-entry totals reflect each adjustment; Saving… is shown briefly until it is stored. Totals remain marked partial until every hole is entered. Tap a hole or score to edit it. Birdies use blue circles; better-than-birdie scores use a double circle; par is a plain number; bogeys use red squares; double bogey or worse uses a darker red square with a double border. Labels and shapes supplement color. A saved score that remains at 1 for 1.2 seconds triggers a brief ACE cue. Passing through 1 while tapping toward another score does not celebrate; reopening or reloading does not replay the cue. Reduced motion suppresses its animation.
 
 Every hole starts at **par 3**. Tap the par label to choose 2–9; editing par never changes strokes. Rounds have 9 or 18 holes. The roster limit remains 24, not four. New rounds include all saved players; earlier rounds remain available in Setup.
 
@@ -43,7 +45,7 @@ Every hole starts at **par 3**. Tap the par label to choose 2–9; editing par n
 
 Hole 1 uses roster order. On each following hole, players are sorted by their score on the **previous hole**, with ties retaining the previous tee order. This is not a cumulative-total ranking. Thus a player who earns honors on hole 1 keeps them for hole 3 if everyone ties on hole 2.
 
-Missing scores hold Next hole and forward playing-hole selection; they never count as zero or silently decide honors. After every player has a saved score, Next hole selects the first player in the resulting order. Established tee orders are stored when a hole begins; later corrections do not rewrite the order already used on that hole. Scores can be entered without requiring every player to use the challenge roller.
+Previous/Next can review any scoring hole. Missing scores never count as zero and keep the next playing-hole selection and tee order pending. Once prior-hole scores are complete, navigation selects the first player using those scores; tied players retain prior honors. Unstarted, provisional honors reflect corrections, while already-established orders remain unchanged. Scores can be entered without requiring every player to use the challenge roller.
 
 ## Data, migration and privacy
 
@@ -65,7 +67,7 @@ Older installed copies may need an online reload, a short wait for download, the
 
 - model.js: versioned state, migration, validated commands, stable identities, tee order, par and stroke rules, local persistence.
 - app.js / reel-motion.js: screens, explicit player handoff and reel timing.
-- score-ui.js: compact minus/plus score controls, atomic save, full card, par editor and ace cue.
+- score-ui.js: compact minus/plus score controls, queued autosave, full card, par editor and ace cue.
 - theme.js / style.css: saved Day/Night choice, system default, on-course colors and responsive layout.
 - sw.js / build.mjs: offline shell and explicit public build assets.
 
