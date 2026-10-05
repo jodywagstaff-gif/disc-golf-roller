@@ -105,3 +105,10 @@ button,.compact-wheel{-webkit-tap-highlight-color:transparent}.compact-wheel,.wh
 @media(max-height:520px) and (max-width:559px){.player-context.long-name .turn-copy small{display:none}}
 :root[data-theme=night]{--double-bg:#401725}
 @media(max-height:700px){.complete-display>p:last-child{display:none}}
+.quick-player{display:grid;grid-template-columns:minmax(0,1fr) 148px;align-items:center;gap:8px}
+.quick-player-name{height:auto;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:5px}
+.quick-player-name strong{max-width:100%;font-size:16px}.quick-player-name small{font-size:13px}
+.score-stepper{display:grid;grid-template-columns:44px 52px 44px;gap:4px;align-items:center;touch-action:pan-y}
+.score-stepper button{width:44px;height:44px;min-height:44px;padding:0;border-radius:50%;font:800 30px/1 system-ui;background:var(--button);color:var(--button-text);touch-action:manipulation}
+.stroke-value{display:block;text-align:center;font:850 32px/44px system-ui;font-variant-numeric:tabular-nums;user-select:none;-webkit-user-select:none;color:var(--text)}
+.round-totals b{font-size:24px;white-space:nowrap}

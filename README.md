@@ -31,11 +31,11 @@ After all three choices, a named **Pass to…** button switches to the first rem
 
 ## Quick scoring and full card
 
-Scores opens a compact hole-entry panel. At least four player rows fit at 320×480 portrait; larger rosters scroll inside the player list while Save and navigation remain visible. Swipe a score wheel horizontally or use +/−; a vertical swipe scrolls longer player lists. These controls are non-text elements, so score entry does not invoke a numeric keyboard. Keyboard users can use arrow keys, Home/End and Page Up/Down. Player-name entry in Setup intentionally remains a text field.
+Scores opens a compact hole-entry panel. At least four player rows fit at 320×480 portrait; larger rosters scroll inside the player list while Save and navigation remain visible. Use the large minus and plus buttons around one score; a vertical swipe scrolls longer player lists. Unplayed is shown as —; decreasing 1 returns to unplayed. Scores are bounded at 99. These buttons never open a numeric keyboard; keyboard users can Tab to a button and press Enter or Space. Player-name entry in Setup intentionally remains a text field.
 
 **— means unplayed**, not zero or par. Scores range from 1 to 99. Scrolling only changes pending choices; **Save scores** writes the whole hole atomically. Back discards unsaved choices. Save before opening the Full card or another scoring hole. Opening the par editor preserves pending choices.
 
-**Full card** is a separate view with all players, hole scores, par and running totals. Totals remain marked partial until every hole is entered. Tap a hole or score to edit it. Birdies use blue circles; better-than-birdie scores use a double circle; par is a plain number; bogeys use red squares; double bogey or worse uses a darker red square with a double border. Labels and shapes supplement color. A confirmed transition to a score of 1 triggers a brief ACE cue; rendering, reopening or saving the same ace does not replay it. Reduced motion suppresses its animation.
+**Full card** is a separate view with all players, hole scores, par and running totals. Totals show shots followed by relative par in parentheses, for example 28 (-2), 30 (E), or 32 (+2). Only scored holes contribute to relative par; editable pars are reflected immediately. Quick-entry totals include pending edits, which Back discards until Save. Totals remain marked partial until every hole is entered. Tap a hole or score to edit it. Birdies use blue circles; better-than-birdie scores use a double circle; par is a plain number; bogeys use red squares; double bogey or worse uses a darker red square with a double border. Labels and shapes supplement color. A confirmed transition to a score of 1 triggers a brief ACE cue; rendering, reopening or saving the same ace does not replay it. Reduced motion suppresses its animation.
 
 Every hole starts at **par 3**. Tap the par label to choose 2–9; editing par never changes strokes. Rounds have 9 or 18 holes. The roster limit remains 24, not four. New rounds include all saved players; earlier rounds remain available in Setup.
 
@@ -65,7 +65,7 @@ Older installed copies may need an online reload, a short wait for download, the
 
 - model.js: versioned state, migration, validated commands, stable identities, tee order, par and stroke rules, local persistence.
 - app.js / reel-motion.js: screens, explicit player handoff and reel timing.
-- score-ui.js: compact stroke wheels, atomic save, full card, par editor and ace cue.
+- score-ui.js: compact minus/plus score controls, atomic save, full card, par editor and ace cue.
 - theme.js / style.css: saved Day/Night choice, system default, on-course colors and responsive layout.
 - sw.js / build.mjs: offline shell and explicit public build assets.
 

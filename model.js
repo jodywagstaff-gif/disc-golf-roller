@@ -68,7 +68,7 @@ export function validateState(state){
  if(state.draft?.spin){const s=state.draft.spin;if(!Number.isFinite(s.startedAt)||!Number.isInteger(s.start)||s.start<0||!Number.isInteger(s.ordinal)||s.ordinal<0)throw new Error('Saved spin is invalid.');}
  return state;
 }
-export function strokeSummary(round,playerId){const scores=round.scores.filter(s=>s.playerId===playerId);return {total:scores.length?scores.reduce((n,s)=>n+s.strokes,0):null,played:scores.length,holes:round.holes.length,complete:scores.length===round.holes.length};}
+export function strokeSummary(round,playerId){const scores=round.scores.filter(s=>s.playerId===playerId);return {toPar:scores.length?scores.reduce((n,s)=>n+s.strokes-round.holes.find(h=>h.id===s.holeId).par,0):null,total:scores.length?scores.reduce((n,s)=>n+s.strokes,0):null,played:scores.length,holes:round.holes.length,complete:scores.length===round.holes.length};}
 // Commands and stable event IDs form a future synchronization boundary. No remote
 // transport, authentication, conflict merging, or cross-phone guarantees exist yet.
 export function applyCommand(input,type,payload={}){
