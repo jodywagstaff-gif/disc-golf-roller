@@ -40,7 +40,7 @@ export const wildcardOptions = stage => stage==='disc'?DISCS.slice(0,-1):stage==
 export const poolFor = (stage,exp) => stage==='disc'?DISCS:stage==='stability'?stabilities(exp):shots(exp);
 export const normalizeIndex = (index,length) => ((index%length)+length)%length;
 export function makeRound(players,holeCount=9) {
-  if(![9,18].includes(holeCount))throw new Error('Choose a 9- or 18-hole round.');
+  if(!Number.isInteger(holeCount)||holeCount<1||holeCount>72)throw new Error('Choose a whole number of holes from 1 to 72.');
  return {id:newId(),createdAt:now(),mode:{...STROKE_PLAY},playerIds:players.map(p=>p.id),holes:Array.from({length:holeCount},(_,i)=>({id:newId(),number:i+1,par:3})),teeOrders:{},scores:[],challenges:[]};
 }
 export function freshState(){
@@ -57,7 +57,7 @@ export function validateState(state){
  for(const player of state.players){register(player.id);if(typeof player.name!=='string'||!player.name.trim()||player.name.length>32)throw new Error('Saved player names are invalid.');}
  const players=new Set(state.players.map(p=>p.id));
  for(const round of state.rounds){
-  register(round.id);if(round.mode?.id!=='stroke-play'||round.mode.version!==1||!Array.isArray(round.holes)||![9,18].includes(round.holes.length)||!Array.isArray(round.playerIds)||round.playerIds.some(id=>!players.has(id))||new Set(round.playerIds).size!==round.playerIds.length||!Array.isArray(round.scores)||!Array.isArray(round.challenges))throw new Error('Saved round is invalid.');
+  register(round.id);if(round.mode?.id!=='stroke-play'||round.mode.version!==1||!Array.isArray(round.holes)||round.holes.length<1||round.holes.length>72||!Array.isArray(round.playerIds)||round.playerIds.some(id=>!players.has(id))||new Set(round.playerIds).size!==round.playerIds.length||!Array.isArray(round.scores)||!Array.isArray(round.challenges))throw new Error('Saved round is invalid.');
   const holes=new Set();round.holes.forEach((h,i)=>{register(h.id);holes.add(h.id);if(h.number!==i+1||!Number.isInteger(h.par)||h.par<2||h.par>9)throw new Error('Saved holes are invalid.')});
   if(!round.teeOrders||typeof round.teeOrders!=='object'||Array.isArray(round.teeOrders)||Object.entries(round.teeOrders).some(([holeId,order])=>!holes.has(holeId)||!Array.isArray(order)||new Set(order).size!==order.length||order.some(id=>!round.playerIds.includes(id))))throw new Error('Saved tee order is invalid.');
   const scoreKeys=new Set();for(const score of round.scores){register(score.id);const key=score.playerId+score.holeId;if(scoreKeys.has(key)||!round.playerIds.includes(score.playerId)||!holes.has(score.holeId)||!Number.isInteger(score.strokes)||score.strokes<1||score.strokes>99)throw new Error('Saved scores are invalid.');scoreKeys.add(key)}

@@ -19,7 +19,7 @@ const server=http.createServer(async(req,res)=>{
   if(file==='version.json')body=JSON.stringify({commit:versions[phase]||phase});
   else if(file==='release.js')body='export const BUILD_ID='+JSON.stringify(phase)+';';
   else body=fixtures[phase+'/'+file]||await fs.readFile(file);
-  if(file==='sw.js'&&phase==='next')body=body.toString().replace('v9-1','v9-2');
+  if(file==='sw.js'&&phase==='next')body=body.toString().replace('v10-1','v10-2');
   res.writeHead(200,{'Content-Type':mime[file.split('.').pop()]||'application/json','Cache-Control':'no-store'});res.end(body);
  }catch{res.writeHead(404);res.end();}
 });
@@ -41,7 +41,7 @@ try{
  phase='slot';await update(p);await p.waitForFunction(async()=>!!(await navigator.serviceWorker.getRegistration()).waiting);
  await p.reload();assert.equal(await p.locator('#reelWindow').count(),0);assert.equal(await snapshot(p),saved);
  report.checks.push('Reproduced c764 -> 649 waiting worker: two old tabs keep serving old UI after reload');
- phase='fixed';await update(p);await p.waitForFunction(async()=>{const r=await navigator.serviceWorker.getRegistration();return !r.waiting&&!r.installing&&r.active?.state==='activated'&&(await caches.keys()).includes('disc-roller-shell-v9-1');});
+ phase='fixed';await update(p);await p.waitForFunction(async()=>{const r=await navigator.serviceWorker.getRegistration();return !r.waiting&&!r.installing&&r.active?.state==='activated'&&(await caches.keys()).includes('disc-roller-shell-v10-1');});
  // Old workers fetch unknown release.js from the network, so only a cached
  // navigation document proves that this client has switched controllers.
  await p.waitForFunction(async()=>(await (await fetch('./index.html')).text()).includes('id="reelWindow"'));

@@ -17,6 +17,7 @@ The local server binds only to 127.0.0.1:4173 (PORT may override it). The static
 Optional browser tests need Playwright and a Chromium installation. PLAYWRIGHT_MODULE and CHROME_PATH can point to existing installations; TEST_URL selects the local server or authorized preview. Tests use isolated storage and fictional players.
 
 - node tests/course-browser.mjs — manual section starts, four-player handoff, honors, four visible score rows, eight-player touch scrolling, par, ace cue, score symbols, offline scores.
+- node tests/custom-round-browser.mjs - 9/18/Custom, explicit validation, preserved older rounds, bounds and offline reload.
 - node tests/dialog-browser.mjs - prominent Back, backdrop tap/drag guards, nested navigation, keyboard/Escape, focus restoration and retained setup choices.
 - node tests/autosave-browser.mjs - queued rapid taps, immediate persistence, navigation/close/reload, bounds, offline, ace feedback, storage errors and stale tabs.
 - node tests/course-safety-browser.mjs — exact Quick Stop boundaries, saved resume, reduced motion, layouts, contrast, migration, stale tabs and corrupt data.
@@ -39,7 +40,7 @@ Scores opens a compact hole-entry panel. At least four player rows fit at 320×4
 
 **Full card** is a separate view with all players, hole scores, par and running totals. Totals show shots followed by relative par in parentheses, for example 28 (-2), 30 (E), or 32 (+2). Only scored holes contribute to relative par; editable pars are reflected immediately. Quick-entry totals reflect each adjustment; Saving… is shown briefly until it is stored. Totals remain marked partial until every hole is entered. Tap a hole or score to edit it. Birdies use blue circles; better-than-birdie scores use a double circle; par is a plain number; bogeys use red squares; double bogey or worse uses a darker red square with a double border. Labels and shapes supplement color. A saved score that remains at 1 for 1.2 seconds triggers a brief ACE cue. Passing through 1 while tapping toward another score does not celebrate; reopening or reloading does not replay the cue. Reduced motion suppresses its animation.
 
-Every hole starts at **par 3**. Tap the par label to choose 2–9; editing par never changes strokes. Rounds have 9 or 18 holes. The roster limit remains 24, not four. New rounds include all saved players; earlier rounds remain available in Setup.
+Every hole starts at **par 3**. Tap the par label to choose 2–9; editing par never changes strokes. New rounds offer 9 holes, 18 holes, or Custom (a whole number from 1 to 72). Invalid, blank, fractional, and out-of-range counts are rejected without starting or changing a round; counts are never silently rounded or truncated. The roster limit remains 24, not four. New rounds include all saved players; earlier rounds remain available in Setup.
 
 ## Tee order
 
