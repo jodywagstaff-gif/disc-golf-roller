@@ -31,19 +31,19 @@
         <div id="idleDisplay" class="idle-display"><div class="pixel-disc" aria-hidden="true"></div><p class="pixel-title">LET IT FLY</p><p id="playerPrompt">Begin your disc spin.</p></div>
         <div id="reelDisplay" class="reel-display" hidden><p id="reelStage" class="display-kicker">01 / DISC TYPE</p><div id="reelWindow" class="reel-window" aria-hidden="true"><div class="reel-guide"></div><div id="reelTrack" class="reel-track"></div></div><strong id="reelText" class="sr-only">Driver</strong><p class="display-hint">Begin each section when you’re ready.</p></div>
         <div id="wildDisplay" class="wild-display" hidden><p class="display-kicker">✦ WILD CARD ✦</p><h2 id="wildTitle">Your choice.</h2><div id="wildOptions" class="wild-options"></div></div>
-        <div id="completeDisplay" class="complete-display" hidden><p class="locked-badge">✓ CHALLENGE LOCKED</p><div id="finalChallenge" class="final-challenge"></div><p id="completePlayer"></p></div>
+        <div id="finalRollDisplay" class="final-roll-display" hidden><p class="display-kicker">SHOT LOCKED</p><strong id="finalRollValue"></strong></div><div id="completeDisplay" class="complete-display" hidden><p class="locked-badge">✓ CHALLENGE LOCKED</p><div id="finalChallenge" class="final-challenge"></div><p id="completePlayer"></p></div>
       </div>
       <div id="reelSlots" class="reel-slots" aria-label="Your challenge"><div class="reel-slot" id="slot-disc"><span>DISC</span><strong id="result-disc">—</strong></div><div class="reel-slot" id="slot-stability"><span>STABILITY</span><strong id="result-stability">—</strong></div><div class="reel-slot" id="slot-shot"><span>SHOT</span><strong id="result-shot">—</strong></div></div>
       <button id="mainAction" class="arcade-button"><span id="actionLabel">ROLL</span><span id="actionIcon" aria-hidden="true">↗</span></button>
       <nav class="game-nav" aria-label="Game tools"><button id="openScores"><span aria-hidden="true">▤</span> Scores</button><button id="openPlayers"><span aria-hidden="true">◈</span> Setup</button><button id="openHelp"><span aria-hidden="true">?</span> Help</button></nav>
     </section>
-  </main>
+  </main><dialog id="aceDialog" class="ace-modal" aria-labelledby="aceTitle" aria-describedby="acePlayers"><div class="ace-star" aria-hidden="true">★</div><h2 id="aceTitle">ACE!</h2><p class="ace-subtitle">HOLE IN ONE</p><p id="acePlayers"></p><button id="dismissAce">Let’s go →</button></dialog>
   <div id="notice" class="notice" role="alert" hidden></div>
   <div id="announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
   <dialog id="scoresDialog" class="sheet quick-sheet" aria-labelledby="scoreTitle">
     <header class="sheet-header"><h2 id="scoreTitle">Scores</h2><button id="openScorecard" class="card-link">Full card</button><button class="close-button" data-close>← Back</button></header>
     <div class="sheet-body quick-body"><div class="quick-hole-bar"><strong id="quickHoleLabel">Hole 1</strong><button id="parButton" aria-label="Edit hole par">Par 3 ✎</button></div><p class="wheel-help">Tap − / + · — means unplayed</p><p id="scoreEmpty" class="empty-note">Add players in Setup to keep score.</p><div id="holeWheels" class="quick-player-list"></div></div>
-    <footer class="quick-footer"><div id="aceCue" class="ace-cue" role="status" hidden></div><div class="score-actions"><button id="previousScoreHole">← Previous hole</button><button id="nextScoreHole">Next hole →</button></div><p id="saveStatus" class="save-status">Scores stay on this device.</p></footer>
+    <footer class="quick-footer"><div class="score-actions"><button id="previousScoreHole">← Previous hole</button><button id="nextScoreHole">Next hole →</button></div><p id="saveStatus" class="save-status">Scores stay on this device.</p></footer>
   </dialog>
   <dialog id="scorecardDialog" class="sheet" aria-labelledby="cardTitle">
     <header class="sheet-header"><h2 id="cardTitle">Full scorecard</h2><button class="close-button" data-close>← Back</button></header>

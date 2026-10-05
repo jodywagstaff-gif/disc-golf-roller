@@ -60,6 +60,7 @@ export function validateState(state){
   register(round.id);if(round.mode?.id!=='stroke-play'||round.mode.version!==1||!Array.isArray(round.holes)||round.holes.length<1||round.holes.length>72||!Array.isArray(round.playerIds)||round.playerIds.some(id=>!players.has(id))||new Set(round.playerIds).size!==round.playerIds.length||!Array.isArray(round.scores)||!Array.isArray(round.challenges))throw new Error('Saved round is invalid.');
   const holes=new Set();round.holes.forEach((h,i)=>{register(h.id);holes.add(h.id);if(h.number!==i+1||!Number.isInteger(h.par)||h.par<2||h.par>9)throw new Error('Saved holes are invalid.')});
   if(!round.teeOrders||typeof round.teeOrders!=='object'||Array.isArray(round.teeOrders)||Object.entries(round.teeOrders).some(([holeId,order])=>!holes.has(holeId)||!Array.isArray(order)||new Set(order).size!==order.length||order.some(id=>!round.playerIds.includes(id))))throw new Error('Saved tee order is invalid.');
+  if(round.aceCelebrations!==undefined&&(!Array.isArray(round.aceCelebrations)||round.aceCelebrations.some(a=>!holes.has(a.holeId)||!round.playerIds.includes(a.playerId))))throw new Error('Saved ace celebrations are invalid.');
   const scoreKeys=new Set();for(const score of round.scores){register(score.id);const key=score.playerId+score.holeId;if(scoreKeys.has(key)||!round.playerIds.includes(score.playerId)||!holes.has(score.holeId)||!Number.isInteger(score.strokes)||score.strokes<1||score.strokes>99)throw new Error('Saved scores are invalid.');scoreKeys.add(key)}
   for(const challenge of round.challenges){register(challenge.id);if((challenge.playerId!==null&&!round.playerIds.includes(challenge.playerId))||!holes.has(challenge.holeId)||!DISCS.slice(0,-1).includes(challenge.disc)||!wildcardOptions('stability').includes(challenge.stability)||!wildcardOptions('shot').includes(challenge.shot))throw new Error('Saved challenge is invalid.');}
  }
@@ -90,7 +91,7 @@ export function applyCommand(input,type,payload={}){
   if(state.draft&&state.draft.stage!=='complete')throw new Error('Finish this challenge before passing the phone.');
   const next=remainingPlayers(round,state.activeHoleId)[0];if(!next)throw new Error('Everyone is ready. Enter this hole’s scores.');state.activePlayerId=next;state.draft=null;break;
  }
- case 'hole.advance':{
+  case 'hole.advance':{
   if(state.draft&&state.draft.stage!=='complete')throw new Error('Finish this challenge before moving to the next hole.');
   const index=round.holes.findIndex(h=>h.id===state.activeHoleId);const next=round.holes[index+1];if(!next)throw new Error('This is the last hole.');
   const honors=teeOrder(round,next.id);if(!honors.ready)throw new Error('Enter every score for hole '+honors.missingHole+' to set the next tee order.');
@@ -131,6 +132,16 @@ export function applyCommand(input,type,payload={}){
    }
    if(!state.draft&&!round.teeOrders[state.activeHoleId]){const honors=teeOrder(round,state.activeHoleId);if(honors.ready)state.activePlayerId=honors.order[0]??null;}
    break;
+  }
+  case 'hole.proceed':{
+   if(state.draft&&state.draft.stage!=='complete')throw new Error('Finish this challenge before moving to the next hole.');
+   const index=round.holes.findIndex(h=>h.id===payload.holeId),next=round.holes[index+1];
+   if(index<0||!next)throw new Error('This is the last hole.');
+   const honors=teeOrder(round,next.id);if(!honors.ready)throw new Error('Enter every score for hole '+honors.missingHole+' before the next hole.');
+   if(round.playerIds.some(id=>!round.scores.some(s=>s.holeId===payload.holeId&&s.playerId===id)))throw new Error('Enter every score for this hole before the next hole.');
+   round.aceCelebrations??=[];
+   for(const s of round.scores.filter(s=>s.holeId===payload.holeId&&s.strokes===1))if(!round.aceCelebrations.some(a=>a.holeId===s.holeId&&a.playerId===s.playerId))round.aceCelebrations.push({holeId:s.holeId,playerId:s.playerId});
+   state.activeHoleId=next.id;state.activePlayerId=honors.order[0]??null;state.draft=null;break;
   }
   case 'round.start':{
   if(state.draft&&state.draft.stage!=='complete')throw new Error('Finish this challenge before starting a new round.');const next=makeRound(state.players,payload.holeCount);state.rounds.push(next);state.activeRoundId=next.id;state.activeHoleId=next.holes[0].id;state.activePlayerId=state.players[0]?.id??null;state.draft=null;break;

@@ -1,6 +1,6 @@
 import {activeRound,strokeSummary,teeOrder,scoreResult,PLAYER_COLORS} from './model.js';
-export function createScoreUI({getState,getHole,setHole,commit,navigate,back,notice,announce,isBlocked,selectHole,refresh}){
- const $=id=>document.getElementById(id);let pending=new Map(),entryHole=null,saving=false,aceTimer=null,aceDelay=null,writes=0,settled=Promise.resolve(),failed=false;const aceCandidates=new Map();
+export function createScoreUI({getState,getHole,setHole,commit,navigate,back,notice,announce,isBlocked,selectHole,nextHole,refresh}){
+ const $=id=>document.getElementById(id);let pending=new Map(),entryHole=null,saving=false,writes=0,settled=Promise.resolve(),failed=false;
  const round=()=>activeRound(getState());
  const selected=()=>round().holes.find(h=>h.id===getHole())||round().holes.find(h=>h.id===getState().activeHoleId);
  const totalText=summary=>summary.total===null?'—':`${summary.total} (${summary.toPar===0?'E':summary.toPar>0?'+'+summary.toPar:summary.toPar})`;
@@ -11,10 +11,7 @@ export function createScoreUI({getState,getHole,setHole,commit,navigate,back,not
  const honors=teeOrder(round(),h.id);$('saveStatus').textContent=failed?'Not saved — reload before editing':writes?'Saving…':!honors.ready?'Saved · hole '+honors.missingHole+' needs scores for tee order':'Saved automatically on this device';
  }
  async function flush(){while(writes)await settled;return !failed&&!isBlocked();}
- function autosave(playerId,holeId,strokes){clearTimeout(aceDelay);clearAce();writes++;const roundId=round().id;if(strokes===1)aceCandidates.set(playerId,holeId);else aceCandidates.delete(playerId);
- const write=commit('score.set',{roundId,playerId,holeId,strokes}).catch(()=>{failed=true;}).finally(()=>{writes--;if(!writes){if(failed){pending=new Map(scoresFor(selected()).map(s=>[s.playerId,s.strokes]));renderEntry({preserve:true});}renderOverview();refresh();}updateControls();});settled=Promise.all([settled,write]);
- aceDelay=setTimeout(async()=>{await flush();if(!failed&&$('scoresDialog').open&&round().id===roundId){const names=[...aceCandidates].filter(([id,hole])=>entryHole===hole&&rScore(id,hole)===1).map(([id])=>getState().players.find(p=>p.id===id).name);if(names.length)showAce(names);}aceCandidates.clear();},1200);
- }
+ function autosave(playerId,holeId,strokes){writes++;const roundId=round().id;const write=commit('score.set',{roundId,playerId,holeId,strokes}).catch(()=>{failed=true;}).finally(()=>{writes--;if(!writes){if(failed){pending=new Map(scoresFor(selected()).map(s=>[s.playerId,s.strokes]));renderEntry({preserve:true});}renderOverview();refresh();}updateControls();});settled=Promise.all([settled,write]);}
  window.addEventListener('beforeunload',event=>{if(writes){event.preventDefault();event.returnValue='';}});
 
  function renderEntry({preserve=false}={}){
@@ -40,11 +37,9 @@ export function createScoreUI({getState,getHole,setHole,commit,navigate,back,not
   }grid.replaceChildren(head,body);grid.parentElement.scrollLeft=left;$('roundTotals').replaceChildren(...totals);$('scoreDescription').textContent=`Round ${getState().rounds.indexOf(r)+1} · ${r.holes.length} holes`;
   const count=r.holes.filter(h=>r.playerIds.length&&r.playerIds.every(id=>r.scores.some(s=>s.playerId===id&&s.holeId===h.id))).length;$('roundProgress').textContent=count+' / '+r.holes.length+' holes complete';
  }
- function clearAce(){clearTimeout(aceTimer);$('aceCue').hidden=true;}
- function showAce(names){clearAce();$('aceCue').textContent='★ ACE! '+names.join(' & ');$('aceCue').hidden=false;announce('Hole in one! '+names.join(' and '));aceTimer=setTimeout(clearAce,4000);}
- function rScore(id,holeId){return round().scores.find(s=>s.playerId===id&&s.holeId===holeId)?.strokes;}
- for(const [id,delta] of [['previousScoreHole',-1],['nextScoreHole',1]])$(id).addEventListener('click',async()=>{if($(id).disabled||!await flush())return;const next=round().holes[selected().number-1+delta];if(!next)return;clearTimeout(aceDelay);aceCandidates.clear();clearAce();try{await selectHole(next.id);setHole(next.id);renderEntry();}catch{}});
+ $('previousScoreHole').addEventListener('click',async()=>{if($('previousScoreHole').disabled||!await flush())return;const previous=round().holes[selected().number-2];if(!previous)return;try{await selectHole(previous.id);setHole(previous.id);renderEntry();}catch{}});
+ $('nextScoreHole').addEventListener('click',async()=>{if($('nextScoreHole').disabled||!await flush()||saving)return;saving=true;updateControls();try{await nextHole(selected().id);}catch{}finally{saving=false;updateControls();} });
  $('openScorecard').addEventListener('click',async()=>{await flush();renderOverview();navigate('scorecard');});
  $('parButton').addEventListener('click',async()=>{if(!await flush())return;const h=selected();$('parTitle').textContent='Hole '+h.number+' par';$('parOptions').replaceChildren(...Array.from({length:8},(_,i)=>{const b=document.createElement('button');b.textContent=i+2;b.setAttribute('aria-label','Set par '+(i+2));b.setAttribute('aria-pressed',String(h.par===i+2));b.addEventListener('click',async()=>{if(saving||isBlocked())return;saving=true;try{await commit('par.set',{holeId:h.id,par:i+2});renderOverview();notice('');back();}catch{}finally{saving=false;updateControls();}});return b;}));navigate('par');});
- return {open,enter:renderEntry,render:()=>{renderOverview();if($('scoresDialog').open)updateControls();},leave:()=>{clearTimeout(aceDelay);aceCandidates.clear();clearAce();},clearAce};
+ return {open,enter:renderEntry,render:()=>{renderOverview();if($('scoresDialog').open)updateControls();},leave:()=>{}};
 }
