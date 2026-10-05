@@ -16,6 +16,7 @@ The local server binds only to 127.0.0.1:4173 (PORT may override it). The static
 
 Optional browser tests need Playwright and a Chromium installation. PLAYWRIGHT_MODULE and CHROME_PATH can point to existing installations; TEST_URL selects the local server or authorized preview. Tests use isolated storage and fictional players.
 
+- node tests/quick-setup-browser.mjs - empty and mid-round quick player setup, color/skill validation, four-row layouts, offline metadata, same-round hole resize and reduction confirmation.
 - node tests/course-browser.mjs — manual section starts, four-player handoff, honors, four visible score rows, eight-player touch scrolling, par, ace cue, score symbols, offline scores.
 - node tests/custom-round-browser.mjs - 9/18/Custom, explicit validation, preserved older rounds, bounds and offline reload.
 - node tests/effects-browser.mjs - final shot pause, interruption, named centered ace on Next, persistent replay prevention and reduced motion.
@@ -36,11 +37,13 @@ After all three choices, a named **Pass to…** button switches to the first rem
 
 ## Quick scoring and full card
 
-Scores opens a compact hole-entry panel. At least four player rows fit at 320×480 portrait; larger rosters scroll inside the player list while Previous hole and Next hole remain visible. Use the large minus and plus buttons around one score; a vertical swipe scrolls longer player lists. Unplayed is shown as —; decreasing 1 returns to unplayed. Scores are bounded at 99. These buttons never open a numeric keyboard; keyboard users can Tab to a button and press Enter or Space. Player-name entry in Setup intentionally remains a text field.
+Scores opens a compact hole-entry panel. **+ Player** opens quick entry for a name, a distinct unused color, and optional Beginner/Intermediate/Advanced skill metadata (default Not specified). Skill metadata never changes spins, handicaps, or scoring. Mid-round additions join the current playing hole; earlier holes remain blank and are excluded from their required scores and tee-order calculations. Photos/effects are deferred; there are no uploads or new external services. At least four player rows fit at 320×480 portrait; larger rosters scroll inside the player list while Previous hole and Next hole remain visible. Use the large minus and plus buttons around one score; a vertical swipe scrolls longer player lists. Unplayed is shown as —; decreasing 1 returns to unplayed. Scores are bounded at 99. These buttons never open a numeric keyboard; keyboard users can Tab to a button and press Enter or Space. Player-name entry in Setup intentionally remains a text field.
 
 **— means unplayed**, not zero or par. Each minus/plus tap saves immediately to this device; persistence is not debounced. Rapid taps are queued in order. Previous hole and Next hole wait for queued writes. Previous shows the earlier scorecard for corrections; Next returns to the next hole’s roller once required scores are complete. Neither fills blank scores. Back closes the panel and keeps edits. The prominent Back button, Escape, and a tap outside a popup all return one level. Inside-to-outside drags do not dismiss it; underlying game buttons are not activated. Unsubmitted setup choices remain available when reopened. Return to a hole to correct a score. Storage errors restore the last saved value, show an error, and block further edits until reload.
 
 **Full card** is a separate view with all players, hole scores, par and running totals. Totals show shots followed by relative par in parentheses, for example 28 (-2), 30 (E), or 32 (+2). Only scored holes contribute to relative par; editable pars are reflected immediately. Quick-entry totals reflect each adjustment; Saving… is shown briefly until it is stored. Totals remain marked partial until every hole is entered. Tap a hole or score to edit it. Birdies use blue circles; better-than-birdie scores use a double circle; par is a plain number; bogeys use red squares; double bogey or worse uses a darker red square with a double border. Labels and shapes supplement color. ACEs are celebrated in a centered popup only when Next hole returns to the roller. Multiple aces name each player. Scores corrected away from 1 do not celebrate. The transition saves the celebration receipt before showing it, so reloads and revisits do not replay it. Dismiss with Let’s go, Escape, or outside tap; it also closes after 4.5 seconds. Reduced motion removes its entrance animation.
+
+The hole-count button inside Scores opens **Set up holes** for this existing game: 9, 18, or Custom (1–72). Increasing keeps existing hole IDs, pars, scores and history. Removing played holes requires a separate explicit confirmation naming the amount of data removed; Back cancels. A hole containing the current challenge cannot be removed. This action does not create another round. **Resume a saved game**, **Start a new round**, and **How many holes?** distinguish history from new-game length.
 
 Every hole starts at **par 3**. Tap the par label to choose 2–9; editing par never changes strokes. New rounds offer 9 holes, 18 holes, or Custom (a whole number from 1 to 72). Invalid, blank, fractional, and out-of-range counts are rejected without starting or changing a round; counts are never silently rounded or truncated. The roster limit remains 24, not four. New rounds include all saved players; earlier rounds remain available in Setup.
 
@@ -70,6 +73,7 @@ Older installed copies may need an online reload, a short wait for download, the
 
 - model.js: versioned state, migration, validated commands, stable identities, tee order, par and stroke rules, local persistence.
 - app.js / reel-motion.js: screens, explicit player handoff and reel timing.
+- quick-setup.js: compact player and same-round hole setup.
 - score-ui.js: compact minus/plus score controls, queued autosave, full card, par editor and ace cue.
 - theme.js / style.css: saved Day/Night choice, system default, on-course colors and responsive layout.
 - sw.js / build.mjs: offline shell and explicit public build assets.

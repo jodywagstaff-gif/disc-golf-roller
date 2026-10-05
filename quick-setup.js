@@ -1,0 +1,21 @@
+import {activeRound,PLAYER_COLORS} from './model.js';
+const COLOR_NAMES=['Coral','Teal','Lavender','Gold','Sky blue','Pink','Sage','Apricot','Aqua','Sand','Periwinkle','Lime','Orchid','Mint','Rose','Slate blue','Blush','Olive','Peach','Lilac gray','Violet','Leaf green','Terracotta','Sea blue'];
+export function createQuickSetup({getState,commit,navigate,back,render,flush,isBlocked,notice}){
+ const $=id=>document.getElementById(id);let selectedColor=0,busy=false,removalCount=null;
+ const round=()=>activeRound(getState());
+ function error(id,message){$(id).textContent=message;$(id).hidden=!message;}
+ $('quickPlayerAdd').addEventListener('click',async()=>{if(!await flush())return;error('quickPlayerError','');$('quickPlayerName').value='';$('quickPlayerSkill').value='';selectedColor=PLAYER_COLORS.findIndex((_,i)=>!getState().players.some(p=>p.colorIndex===i));$('quickPlayerJoin').textContent='Joins from hole '+round().holes.find(h=>h.id===getState().activeHoleId).number+'. Earlier holes stay unplayed.';
+  $('quickColors').replaceChildren(...PLAYER_COLORS.map((color,index)=>{const b=document.createElement('button');b.type='button';b.style.backgroundColor=color;b.setAttribute('aria-label',COLOR_NAMES[index]);b.setAttribute('aria-pressed',String(index===selectedColor));b.textContent=index===selectedColor?'✓':'';b.disabled=getState().players.some(p=>p.colorIndex===index);b.addEventListener('click',()=>{selectedColor=index;for(const [i,button] of [...$('quickColors').children].entries()){button.setAttribute('aria-pressed',String(i===index));button.textContent=i===index?'✓':'';}});return b;}));navigate('add-player');
+ });
+ $('quickPlayerName').addEventListener('input',()=>{const name=$('quickPlayerName').value.trim();if(name&&!getState().players.some(p=>p.name.toLocaleLowerCase()===name.toLocaleLowerCase()))error('quickPlayerError','');});
+ $('quickPlayerForm').addEventListener('submit',async event=>{event.preventDefault();if(busy||isBlocked())return;busy=true;$('quickPlayerSave').disabled=true;try{await commit('player.add',{name:$('quickPlayerName').value,colorIndex:selectedColor,skillLevel:$('quickPlayerSkill').value||null});error('quickPlayerError','');notice('');render();back();}catch(e){error('quickPlayerError',e.message);if(e.commandValidation)notice('');}finally{busy=false;$('quickPlayerSave').disabled=false;}});
+ function custom(){const on=$('quickHoleCount').value==='custom';$('quickCustomField').hidden=!on;removalCount=null;$('confirmHoleRemoval').hidden=true;error('quickHoleError','');}
+ $('quickHoleCount').addEventListener('change',custom);$('quickCustomCount').addEventListener('input',()=>{removalCount=null;$('confirmHoleRemoval').hidden=true;error('quickHoleError','');});
+ $('quickHoleSetup').addEventListener('click',async()=>{if(!await flush())return;const n=round().holes.length;$('quickHoleCount').value=[9,18].includes(n)?String(n):'custom';$('quickCustomCount').value=String(n);custom();navigate('hole-setup');});
+ async function saveHoles(confirmed=false){if(busy||isBlocked())return;const n=Number($('quickHoleCount').value==='custom'?$('quickCustomCount').value:$('quickHoleCount').value);if(!Number.isInteger(n)||n<1||n>72){error('quickHoleError','Enter a whole number from 1 to 72.');return;}
+  const removed=round().holes.slice(n).map(h=>h.id),scores=round().scores.filter(s=>removed.includes(s.holeId)).length,challenges=round().challenges.filter(c=>removed.includes(c.holeId)).length;
+  if((scores||challenges)&&(!confirmed||removalCount!==n)){removalCount=n;error('quickHoleError','This removes '+removed.length+' holes, '+scores+' saved scores and '+challenges+' challenges. Remaining holes and other rounds stay unchanged.');$('confirmHoleRemoval').hidden=false;return;}
+  busy=true;$('quickHolesSave').disabled=true;$('confirmHoleRemoval').disabled=true;try{await commit('round.resize',{holeCount:n,confirmRemoval:confirmed&&removalCount===n});error('quickHoleError','');notice('');render();back();}catch(e){error('quickHoleError',e.message);}finally{busy=false;$('quickHolesSave').disabled=false;$('confirmHoleRemoval').disabled=false;}
+ }
+ $('quickHolesSave').addEventListener('click',()=>saveHoles());$('confirmHoleRemoval').addEventListener('click',()=>saveHoles(true));
+}

@@ -4,7 +4,7 @@ services:
     runtime: static
     repo: https://github.com/jodywagstaff-gif/disc-golf-roller
     branch: main
-    buildCommand: node --test tests/model.test.mjs tests/course-model.test.mjs && node build.mjs
+    buildCommand: node --test tests/model.test.mjs tests/course-model.test.mjs tests/quick-setup-model.test.mjs && node build.mjs
     staticPublishPath: ./dist
     autoDeployTrigger: checksPass
     headers:

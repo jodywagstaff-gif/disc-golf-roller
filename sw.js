@@ -1,5 +1,6 @@
-const CACHE='disc-roller-shell-v11-1';
-const SHELL=['./index.html','./style.css','./app.js','./model.js','./reel-motion.js','./release.js','./theme.js','./score-ui.js','./manifest.webmanifest','./assets/icon.svg','./assets/course.svg','./assets/press-start-2p.woff2'];
+const CACHE='disc-roller-shell-v12-1';
+self.addEventListener('message',event=>{if(event.data?.type==='cache-version')event.ports[0]?.postMessage({cache:CACHE});});
+const SHELL=['./index.html','./style.css','./app.js','./model.js','./reel-motion.js','./release.js','./theme.js','./score-ui.js','./quick-setup.js','./manifest.webmanifest','./assets/icon.svg','./assets/course.svg','./assets/press-start-2p.woff2'];
 // Activate the completed shell for the NEXT navigation, even when old tabs are
 // open. Never navigate/reload clients: existing JavaScript and scores stay put.
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL.map(url=>new Request(url,{cache:'reload'})))).then(()=>self.skipWaiting())));

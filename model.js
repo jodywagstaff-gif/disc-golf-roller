@@ -9,17 +9,15 @@ export function migrateState(input){
  state.rounds?.forEach(r=>{r.holes?.forEach(h=>{if(h.par===null)h.par=3;});r.teeOrders={};});
  return state;
 }
+export function playersForHole(round,holeId){const target=round.holes.findIndex(h=>h.id===holeId);return round.playerIds.filter(id=>{const start=round.playerStarts?.[id];return !start||round.holes.findIndex(h=>h.id===start)<=target;});}
 export function teeOrder(round,holeId){
- let order=round.playerIds.slice();const target=round.holes.findIndex(h=>h.id===holeId);
- if(target<0)throw new Error('Hole not found.');
+ let order=[];const target=round.holes.findIndex(h=>h.id===holeId);if(target<0)throw new Error('Hole not found.');
  for(let i=0;i<=target;i++){
-  const saved=round.teeOrders?.[round.holes[i].id];if(saved){order=[...saved.filter(id=>round.playerIds.includes(id)),...round.playerIds.filter(id=>!saved.includes(id))];continue;}
-  if(i===0)continue;
-  const previous=round.holes[i-1];const scores=new Map(round.scores.filter(s=>s.holeId===previous.id).map(s=>[s.playerId,s.strokes]));
-  if(order.some(id=>!scores.has(id)))return {order,ready:false,missingHole:previous.number};
-  order=order.map((id,index)=>({id,index})).sort((a,b)=>scores.get(a.id)-scores.get(b.id)||a.index-b.index).map(p=>p.id);
- }
- return {order,ready:true,missingHole:null};
+  const h=round.holes[i],eligible=playersForHole(round,h.id),saved=round.teeOrders?.[h.id];
+  if(saved){order=[...saved.filter(id=>eligible.includes(id)),...eligible.filter(id=>!saved.includes(id))];continue;}
+  if(i>0){const previous=round.holes[i-1],scores=new Map(round.scores.filter(s=>s.holeId===previous.id).map(s=>[s.playerId,s.strokes]));if(order.some(id=>!scores.has(id)))return {order:[...order,...eligible.filter(id=>!order.includes(id))],ready:false,missingHole:previous.number};order=order.map((id,index)=>({id,index})).sort((a,b)=>scores.get(a.id)-scores.get(b.id)||a.index-b.index).map(p=>p.id);}
+  order.push(...eligible.filter(id=>!order.includes(id)));
+ }return {order,ready:true,missingHole:null};
 }
 export function remainingPlayers(round,holeId){return teeOrder(round,holeId).order.filter(id=>!round.challenges.some(c=>c.holeId===holeId&&c.playerId===id));}
 export function scoreResult(strokes,par){if(strokes==null)return 'unplayed';if(strokes===1)return 'ace';const delta=strokes-par;return delta<-1?'under-par':delta===-1?'birdie':delta===0?'par':delta===1?'bogey':'double-bogey';}
@@ -54,13 +52,14 @@ export function validateState(state){
  if(!Number.isSafeInteger(state.revision)||state.revision<0||typeof state.deviceId!=='string'||!Array.isArray(state.players)||!Array.isArray(state.rounds)||!Array.isArray(state.events))throw new Error('Saved data is incomplete.');
  const ids=new Set();const register=id=>{if(typeof id!=='string'||!id||ids.has(id))throw new Error('Saved identifiers are invalid.');ids.add(id)};
  if(state.players.some(p=>!Number.isInteger(p.colorIndex)||p.colorIndex<0||p.colorIndex>=PLAYER_COLORS.length)||new Set(state.players.map(p=>p.colorIndex)).size!==state.players.length)throw new Error('Saved player colors are invalid.');
- for(const player of state.players){register(player.id);if(typeof player.name!=='string'||!player.name.trim()||player.name.length>32)throw new Error('Saved player names are invalid.');}
+ for(const player of state.players){register(player.id);if(player.skillLevel!=null&&!['beginner','intermediate','advanced'].includes(player.skillLevel))throw new Error('Saved skill level is invalid.');if(typeof player.name!=='string'||!player.name.trim()||player.name.length>32)throw new Error('Saved player names are invalid.');}
  const players=new Set(state.players.map(p=>p.id));
  for(const round of state.rounds){
   register(round.id);if(round.mode?.id!=='stroke-play'||round.mode.version!==1||!Array.isArray(round.holes)||round.holes.length<1||round.holes.length>72||!Array.isArray(round.playerIds)||round.playerIds.some(id=>!players.has(id))||new Set(round.playerIds).size!==round.playerIds.length||!Array.isArray(round.scores)||!Array.isArray(round.challenges))throw new Error('Saved round is invalid.');
   const holes=new Set();round.holes.forEach((h,i)=>{register(h.id);holes.add(h.id);if(h.number!==i+1||!Number.isInteger(h.par)||h.par<2||h.par>9)throw new Error('Saved holes are invalid.')});
   if(!round.teeOrders||typeof round.teeOrders!=='object'||Array.isArray(round.teeOrders)||Object.entries(round.teeOrders).some(([holeId,order])=>!holes.has(holeId)||!Array.isArray(order)||new Set(order).size!==order.length||order.some(id=>!round.playerIds.includes(id))))throw new Error('Saved tee order is invalid.');
   if(round.aceCelebrations!==undefined&&(!Array.isArray(round.aceCelebrations)||round.aceCelebrations.some(a=>!holes.has(a.holeId)||!round.playerIds.includes(a.playerId))))throw new Error('Saved ace celebrations are invalid.');
+  if(round.playerStarts!==undefined&&(!round.playerStarts||typeof round.playerStarts!=='object'||Array.isArray(round.playerStarts)||Object.entries(round.playerStarts).some(([id,hole])=>!round.playerIds.includes(id)||!holes.has(hole))))throw new Error('Saved player start is invalid.');
   const scoreKeys=new Set();for(const score of round.scores){register(score.id);const key=score.playerId+score.holeId;if(scoreKeys.has(key)||!round.playerIds.includes(score.playerId)||!holes.has(score.holeId)||!Number.isInteger(score.strokes)||score.strokes<1||score.strokes>99)throw new Error('Saved scores are invalid.');scoreKeys.add(key)}
   for(const challenge of round.challenges){register(challenge.id);if((challenge.playerId!==null&&!round.playerIds.includes(challenge.playerId))||!holes.has(challenge.holeId)||!DISCS.slice(0,-1).includes(challenge.disc)||!wildcardOptions('stability').includes(challenge.stability)||!wildcardOptions('shot').includes(challenge.shot))throw new Error('Saved challenge is invalid.');}
  }
@@ -69,7 +68,7 @@ export function validateState(state){
  if(state.draft?.spin){const s=state.draft.spin;if(!Number.isFinite(s.startedAt)||!Number.isInteger(s.start)||s.start<0||!Number.isInteger(s.ordinal)||s.ordinal<0)throw new Error('Saved spin is invalid.');}
  return state;
 }
-export function strokeSummary(round,playerId){const scores=round.scores.filter(s=>s.playerId===playerId);return {toPar:scores.length?scores.reduce((n,s)=>n+s.strokes-round.holes.find(h=>h.id===s.holeId).par,0):null,total:scores.length?scores.reduce((n,s)=>n+s.strokes,0):null,played:scores.length,holes:round.holes.length,complete:scores.length===round.holes.length};}
+export function strokeSummary(round,playerId){const scores=round.scores.filter(s=>s.playerId===playerId);const eligible=round.holes.filter(h=>playersForHole(round,h.id).includes(playerId)).length;return {toPar:scores.length?scores.reduce((n,s)=>n+s.strokes-round.holes.find(h=>h.id===s.holeId).par,0):null,total:scores.length?scores.reduce((n,s)=>n+s.strokes,0):null,played:scores.length,holes:eligible,complete:scores.length===eligible&&eligible>0};}
 // Commands and stable event IDs form a future synchronization boundary. No remote
 // transport, authentication, conflict merging, or cross-phone guarantees exist yet.
 export function applyCommand(input,type,payload={}){
@@ -79,7 +78,7 @@ export function applyCommand(input,type,payload={}){
   const name=String(payload.name??'').trim();if(!name||name.length>32)throw new Error('Use a player name between 1 and 32 characters.');
   if(state.players.length>=24)throw new Error('This preview supports up to 24 players.');
   if(state.players.some(p=>p.name.toLocaleLowerCase()===name.toLocaleLowerCase()))throw new Error('That player is already on the card. Add an initial to distinguish names.');
-  const colorIndex=PLAYER_COLORS.findIndex((_,i)=>!state.players.some(p=>p.colorIndex===i));const player={id:newId(),name,colorIndex,createdAt:time};state.players.push(player);round.playerIds.push(player.id);if(!state.activePlayerId&&!state.draft)state.activePlayerId=player.id;break;
+  const colorIndex=payload.colorIndex??PLAYER_COLORS.findIndex((_,i)=>!state.players.some(p=>p.colorIndex===i));if(!Number.isInteger(colorIndex)||colorIndex<0||colorIndex>=PLAYER_COLORS.length||state.players.some(p=>p.colorIndex===colorIndex))throw new Error('Choose an unused player color.');const skillLevel=payload.skillLevel??null;if(![null,'beginner','intermediate','advanced'].includes(skillLevel))throw new Error('Choose a valid skill level.');const player={id:newId(),name,colorIndex,skillLevel,createdAt:time};state.players.push(player);round.playerIds.push(player.id);round.playerStarts??={};round.playerStarts[player.id]=state.activeHoleId;if(!state.activePlayerId&&!state.draft)state.activePlayerId=player.id;break;
  }
  case 'player.select':if(state.draft&&state.draft.stage!=='complete')throw new Error('Finish this challenge before switching players.');if(!round.playerIds.includes(payload.playerId))throw new Error('Player not found.');state.activePlayerId=payload.playerId;state.draft=null;break;
  case 'hole.select':{
@@ -138,12 +137,20 @@ export function applyCommand(input,type,payload={}){
    const index=round.holes.findIndex(h=>h.id===payload.holeId),next=round.holes[index+1];
    if(index<0||!next)throw new Error('This is the last hole.');
    const honors=teeOrder(round,next.id);if(!honors.ready)throw new Error('Enter every score for hole '+honors.missingHole+' before the next hole.');
-   if(round.playerIds.some(id=>!round.scores.some(s=>s.holeId===payload.holeId&&s.playerId===id)))throw new Error('Enter every score for this hole before the next hole.');
+   if(playersForHole(round,payload.holeId).some(id=>!round.scores.some(s=>s.holeId===payload.holeId&&s.playerId===id)))throw new Error('Enter every score for this hole before the next hole.');
    round.aceCelebrations??=[];
    for(const s of round.scores.filter(s=>s.holeId===payload.holeId&&s.strokes===1))if(!round.aceCelebrations.some(a=>a.holeId===s.holeId&&a.playerId===s.playerId))round.aceCelebrations.push({holeId:s.holeId,playerId:s.playerId});
    state.activeHoleId=next.id;state.activePlayerId=honors.order[0]??null;state.draft=null;break;
   }
-  case 'round.start':{
+  case 'round.resize':{
+  const count=payload.holeCount;if(!Number.isInteger(count)||count<1||count>72)throw new Error('Choose a whole number of holes from 1 to 72.');
+  const removed=round.holes.slice(count).map(h=>h.id);if(state.draft&&removed.includes(state.draft.holeId))throw new Error('This hole has a challenge. Keep it or start a new round.');
+  const destructive=round.scores.some(s=>removed.includes(s.holeId))||round.challenges.some(c=>removed.includes(c.holeId));if(destructive&&!payload.confirmRemoval)throw new Error('Confirm removal of played holes before shortening this round.');
+  if(count>round.holes.length)for(let i=round.holes.length;i<count;i++)round.holes.push({id:newId(),number:i+1,par:3});else round.holes=round.holes.slice(0,count);
+  round.scores=round.scores.filter(s=>!removed.includes(s.holeId));round.challenges=round.challenges.filter(c=>!removed.includes(c.holeId));for(const id of removed)delete round.teeOrders[id];if(round.aceCelebrations)round.aceCelebrations=round.aceCelebrations.filter(a=>!removed.includes(a.holeId));for(const [id,hole] of Object.entries(round.playerStarts??{}))if(removed.includes(hole))round.playerStarts[id]=round.holes.at(-1).id;
+  if(removed.includes(state.activeHoleId)){state.activeHoleId=round.holes.at(-1).id;state.activePlayerId=teeOrder(round,state.activeHoleId).order[0]??null;}break;
+ }
+ case 'round.start':{
   if(state.draft&&state.draft.stage!=='complete')throw new Error('Finish this challenge before starting a new round.');const next=makeRound(state.players,payload.holeCount);state.rounds.push(next);state.activeRoundId=next.id;state.activeHoleId=next.holes[0].id;state.activePlayerId=state.players[0]?.id??null;state.draft=null;break;
  }
  case 'round.select':{
