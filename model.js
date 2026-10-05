@@ -1,6 +1,28 @@
 // Serializable domain state. UI and storage are adapters, not scoring rules.
 import {QUICK_STOP_DURATION} from './reel-motion.js';
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
+export const PLAYER_COLORS=['#df795b','#43b8a4','#b495e5','#e0b752','#74a9e4','#de88b7','#8fbd62','#e09851','#70bbc5','#bca087','#8396df','#bcb953','#b97dcc','#5fb787','#d8938b','#8eb1c0','#d9a8cb','#a8be8f','#e2ba8e','#8d9ab9','#b7a8db','#a8c66e','#d28599','#64a2b2'];
+export function migrateState(input){
+ if(input?.schemaVersion!==1)return input;
+ const state=structuredClone(input);state.schemaVersion=2;
+ state.players?.forEach((p,i)=>{p.colorIndex=i;});
+ state.rounds?.forEach(r=>{r.holes?.forEach(h=>{if(h.par===null)h.par=3;});r.teeOrders={};});
+ return state;
+}
+export function teeOrder(round,holeId){
+ let order=round.playerIds.slice();const target=round.holes.findIndex(h=>h.id===holeId);
+ if(target<0)throw new Error('Hole not found.');
+ for(let i=0;i<=target;i++){
+  const saved=round.teeOrders?.[round.holes[i].id];if(saved){order=[...saved.filter(id=>round.playerIds.includes(id)),...round.playerIds.filter(id=>!saved.includes(id))];continue;}
+  if(i===0)continue;
+  const previous=round.holes[i-1];const scores=new Map(round.scores.filter(s=>s.holeId===previous.id).map(s=>[s.playerId,s.strokes]));
+  if(order.some(id=>!scores.has(id)))return {order,ready:false,missingHole:previous.number};
+  order=order.map((id,index)=>({id,index})).sort((a,b)=>scores.get(a.id)-scores.get(b.id)||a.index-b.index).map(p=>p.id);
+ }
+ return {order,ready:true,missingHole:null};
+}
+export function remainingPlayers(round,holeId){return teeOrder(round,holeId).order.filter(id=>!round.challenges.some(c=>c.holeId===holeId&&c.playerId===id));}
+export function scoreResult(strokes,par){if(strokes==null)return 'unplayed';if(strokes===1)return 'ace';const delta=strokes-par;return delta<-1?'under-par':delta===-1?'birdie':delta===0?'par':delta===1?'bogey':'double-bogey';}
 export const STORAGE_KEY = 'disc-roller.league.v1';
 export const STROKE_PLAY = Object.freeze({id:'stroke-play', version:1});
 export const newId = () => crypto.randomUUID();
@@ -19,7 +41,7 @@ export const poolFor = (stage,exp) => stage==='disc'?DISCS:stage==='stability'?s
 export const normalizeIndex = (index,length) => ((index%length)+length)%length;
 export function makeRound(players,holeCount=9) {
   if(![9,18].includes(holeCount))throw new Error('Choose a 9- or 18-hole round.');
-  return {id:newId(),createdAt:now(),mode:{...STROKE_PLAY},playerIds:players.map(p=>p.id),holes:Array.from({length:holeCount},(_,i)=>({id:newId(),number:i+1,par:null})),scores:[],challenges:[]};
+ return {id:newId(),createdAt:now(),mode:{...STROKE_PLAY},playerIds:players.map(p=>p.id),holes:Array.from({length:holeCount},(_,i)=>({id:newId(),number:i+1,par:3})),teeOrders:{},scores:[],challenges:[]};
 }
 export function freshState(){
  const round=makeRound([]);
@@ -27,14 +49,17 @@ export function freshState(){
 }
 export const activeRound = state => state.rounds.find(r=>r.id===state.activeRoundId);
 export function validateState(state){
+ state=migrateState(state);
  if(!state||state.schemaVersion!==SCHEMA_VERSION)throw new Error('This saved version cannot be opened by this app. Export a backup before using a different version.');
  if(!Number.isSafeInteger(state.revision)||state.revision<0||typeof state.deviceId!=='string'||!Array.isArray(state.players)||!Array.isArray(state.rounds)||!Array.isArray(state.events))throw new Error('Saved data is incomplete.');
  const ids=new Set();const register=id=>{if(typeof id!=='string'||!id||ids.has(id))throw new Error('Saved identifiers are invalid.');ids.add(id)};
+ if(state.players.some(p=>!Number.isInteger(p.colorIndex)||p.colorIndex<0||p.colorIndex>=PLAYER_COLORS.length)||new Set(state.players.map(p=>p.colorIndex)).size!==state.players.length)throw new Error('Saved player colors are invalid.');
  for(const player of state.players){register(player.id);if(typeof player.name!=='string'||!player.name.trim()||player.name.length>32)throw new Error('Saved player names are invalid.');}
  const players=new Set(state.players.map(p=>p.id));
  for(const round of state.rounds){
   register(round.id);if(round.mode?.id!=='stroke-play'||round.mode.version!==1||!Array.isArray(round.holes)||![9,18].includes(round.holes.length)||!Array.isArray(round.playerIds)||round.playerIds.some(id=>!players.has(id))||new Set(round.playerIds).size!==round.playerIds.length||!Array.isArray(round.scores)||!Array.isArray(round.challenges))throw new Error('Saved round is invalid.');
-  const holes=new Set();round.holes.forEach((h,i)=>{register(h.id);holes.add(h.id);if(h.number!==i+1||h.par!==null)throw new Error('Saved holes are invalid.')});
+  const holes=new Set();round.holes.forEach((h,i)=>{register(h.id);holes.add(h.id);if(h.number!==i+1||!Number.isInteger(h.par)||h.par<2||h.par>9)throw new Error('Saved holes are invalid.')});
+  if(!round.teeOrders||typeof round.teeOrders!=='object'||Array.isArray(round.teeOrders)||Object.entries(round.teeOrders).some(([holeId,order])=>!holes.has(holeId)||!Array.isArray(order)||new Set(order).size!==order.length||order.some(id=>!round.playerIds.includes(id))))throw new Error('Saved tee order is invalid.');
   const scoreKeys=new Set();for(const score of round.scores){register(score.id);const key=score.playerId+score.holeId;if(scoreKeys.has(key)||!round.playerIds.includes(score.playerId)||!holes.has(score.holeId)||!Number.isInteger(score.strokes)||score.strokes<1||score.strokes>99)throw new Error('Saved scores are invalid.');scoreKeys.add(key)}
   for(const challenge of round.challenges){register(challenge.id);if((challenge.playerId!==null&&!round.playerIds.includes(challenge.playerId))||!holes.has(challenge.holeId)||!DISCS.slice(0,-1).includes(challenge.disc)||!wildcardOptions('stability').includes(challenge.stability)||!wildcardOptions('shot').includes(challenge.shot))throw new Error('Saved challenge is invalid.');}
  }
@@ -47,18 +72,39 @@ export function strokeSummary(round,playerId){const scores=round.scores.filter(s
 // Commands and stable event IDs form a future synchronization boundary. No remote
 // transport, authentication, conflict merging, or cross-phone guarantees exist yet.
 export function applyCommand(input,type,payload={}){
- const state=structuredClone(input);const round=activeRound(state);const time=now();
+ const state=structuredClone(migrateState(input));const round=activeRound(state);const time=now();
  switch(type){
  case 'player.add':{
   const name=String(payload.name??'').trim();if(!name||name.length>32)throw new Error('Use a player name between 1 and 32 characters.');
   if(state.players.length>=24)throw new Error('This preview supports up to 24 players.');
   if(state.players.some(p=>p.name.toLocaleLowerCase()===name.toLocaleLowerCase()))throw new Error('That player is already on the card. Add an initial to distinguish names.');
-  const player={id:newId(),name,createdAt:time};state.players.push(player);round.playerIds.push(player.id);if(!state.activePlayerId&&!state.draft)state.activePlayerId=player.id;break;
+  const colorIndex=PLAYER_COLORS.findIndex((_,i)=>!state.players.some(p=>p.colorIndex===i));const player={id:newId(),name,colorIndex,createdAt:time};state.players.push(player);round.playerIds.push(player.id);if(!state.activePlayerId&&!state.draft)state.activePlayerId=player.id;break;
  }
  case 'player.select':if(state.draft&&state.draft.stage!=='complete')throw new Error('Finish this challenge before switching players.');if(!round.playerIds.includes(payload.playerId))throw new Error('Player not found.');state.activePlayerId=payload.playerId;state.draft=null;break;
- case 'hole.select':if(state.draft&&state.draft.stage!=='complete')throw new Error('Finish this challenge before switching holes.');if(!round.holes.some(h=>h.id===payload.holeId))throw new Error('Hole not found.');state.activeHoleId=payload.holeId;state.draft=null;break;
+ case 'hole.select':{
+  if(state.draft&&state.draft.stage!=='complete')throw new Error('Finish this challenge before switching holes.');
+  const honors=teeOrder(round,payload.holeId);if(!honors.ready)throw new Error('Enter every score for hole '+honors.missingHole+' before starting this hole.');
+  state.activeHoleId=payload.holeId;state.activePlayerId=honors.order[0]??null;state.draft=null;break;
+ }
+ case 'turn.next':{
+  if(state.draft&&state.draft.stage!=='complete')throw new Error('Finish this challenge before passing the phone.');
+  const next=remainingPlayers(round,state.activeHoleId)[0];if(!next)throw new Error('Everyone is ready. Enter this hole’s scores.');state.activePlayerId=next;state.draft=null;break;
+ }
+ case 'hole.advance':{
+  if(state.draft&&state.draft.stage!=='complete')throw new Error('Finish this challenge before moving to the next hole.');
+  const index=round.holes.findIndex(h=>h.id===state.activeHoleId);const next=round.holes[index+1];if(!next)throw new Error('This is the last hole.');
+  const honors=teeOrder(round,next.id);if(!honors.ready)throw new Error('Enter every score for hole '+honors.missingHole+' to set the next tee order.');
+  round.teeOrders[next.id]=honors.order;state.activeHoleId=next.id;state.activePlayerId=honors.order[0]??null;state.draft=null;break;
+ }
+ case 'par.set':{
+  const target=round.holes.find(h=>h.id===payload.holeId);if(!target||!Number.isInteger(payload.par)||payload.par<2||payload.par>9)throw new Error('Choose a par from 2 to 9.');target.par=payload.par;break;
+ }
  case 'difficulty.set':if(!Number.isInteger(payload.experience)||payload.experience<0||payload.experience>100)throw new Error('Invalid difficulty.');state.preferences.experience=payload.experience;break;
- case 'challenge.start':if(state.draft&&state.draft.stage!=='complete')throw new Error('A challenge is already in progress.');state.draft={id:newId(),roundId:round.id,playerId:state.activePlayerId,holeId:state.activeHoleId,stage:'disc',wildcard:false,disc:null,stability:null,shot:null,spin:null,startedAt:time};break;
+ case 'challenge.start':{
+  if(state.draft&&state.draft.stage!=='complete')throw new Error('A challenge is already in progress.');
+  const honors=teeOrder(round,state.activeHoleId);if(!honors.ready)throw new Error('Enter every score for hole '+honors.missingHole+' first.');round.teeOrders[state.activeHoleId]??=honors.order;
+  state.draft={id:newId(),roundId:round.id,playerId:state.activePlayerId,holeId:state.activeHoleId,stage:'disc',wildcard:false,disc:null,stability:null,shot:null,spin:null,startedAt:time};break;
+ }
  case 'challenge.spin':{
   const d=state.draft;if(!d||d.stage==='complete'||d.wildcard||d.spin)throw new Error('Cannot restart this spin.');
   if(!Number.isInteger(payload.start)||payload.start<0||!Number.isInteger(payload.ordinal)||payload.ordinal<0)throw new Error('Invalid spin.');
@@ -97,6 +143,6 @@ export function applyCommand(input,type,payload={}){
 export class LocalRepository {
  constructor(storage){this.storage=storage;}
  load(){const raw=this.storage.getItem(STORAGE_KEY);return raw===null?null:validateState(JSON.parse(raw));}
- save(state,expectedRevision){const raw=this.storage.getItem(STORAGE_KEY);const existing=raw===null?null:validateState(JSON.parse(raw));if((existing?.revision??0)!==expectedRevision)throw new Error('This round changed in another tab. Reload to see the latest scores before continuing.');this.storage.setItem(STORAGE_KEY,JSON.stringify(validateState(state)));}
+ save(state,expectedRevision){const raw=this.storage.getItem(STORAGE_KEY);const existing=raw===null?null:validateState(JSON.parse(raw));if((existing?.revision??0)!==expectedRevision)throw new Error('This round changed in another tab. Reload to see the latest scores before continuing.');const next=JSON.stringify(validateState(state));if(raw&&JSON.parse(raw).schemaVersion===1&&!this.storage.getItem(STORAGE_KEY+'.pre-v2'))this.storage.setItem(STORAGE_KEY+'.pre-v2',raw);this.storage.setItem(STORAGE_KEY,next);}
  raw(){return this.storage.getItem(STORAGE_KEY);}
 }

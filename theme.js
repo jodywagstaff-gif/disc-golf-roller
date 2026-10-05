@@ -4,7 +4,7 @@ let choice=null;
 try{const saved=localStorage.getItem(KEY);if(['day','night'].includes(saved))choice=saved;}catch{}
 function render(){
  const theme=choice||(system.matches?'night':'day');document.documentElement.dataset.theme=theme;
- document.querySelector('meta[name="theme-color"]').content=theme==='day'?'#f3f8ff':'#09121f';
+ document.querySelector('meta[name="theme-color"]').content=theme==='day'?'#dce6dc':'#171526';
  for(const button of document.querySelectorAll('[data-theme-toggle]')){button.textContent=theme==='day'?'☀ Day':'☾ Night';button.setAttribute('aria-label',theme==='day'?'Day skin. Switch to Night':'Night skin. Switch to Day');}
 }
 render();system.addEventListener('change',()=>{if(!choice)render();});
